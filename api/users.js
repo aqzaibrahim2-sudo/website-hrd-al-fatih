@@ -1,3 +1,17 @@
+const ALLOWED_ROLES = ['admin', 'hrd', 'direktur', 'viewer'];
+const INVITE_REDIRECT_URL =
+  'https://website-hrd-al-fatih.vercel.app/reset-password.html';
+
+
+function supabaseHeaders(secretKey) {
+  return {
+    apikey: secretKey,
+    Authorization: `Bearer ${secretKey}`,
+    'Content-Type': 'application/json'
+  };
+}
+
+
 async function getMasterAccount(req) {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
 
@@ -15,7 +29,7 @@ async function getMasterAccount(req) {
     throw new Error('Konfigurasi Supabase belum lengkap.');
   }
 
-  // Validasi session user melalui Supabase Auth
+  // Validasi session melalui Supabase Auth
   const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,
@@ -29,7 +43,7 @@ async function getMasterAccount(req) {
 
   const user = await userResponse.json();
 
-  // Ambil profile dengan secret key karena ini operasi server-side
+  // Ambil profile user dari database
   const profileResponse = await fetch(
     `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=id,full_name,role,is_master,is_active`,
     {
@@ -51,31 +65,28 @@ async function getMasterAccount(req) {
     throw new Error('Profil pengguna tidak ditemukan.');
   }
 
-  // MASTER harus aktif
   if (!profile.is_active) {
     throw new Error('Akun Anda sedang tidak aktif.');
   }
 
-  // Hanya MASTER yang boleh mengakses API User Management
   if (profile.role !== 'master' || profile.is_master !== true) {
-    const error = new Error('Hanya MASTER yang dapat mengelola pengguna.');
+    const error = new Error(
+      'Hanya MASTER yang dapat mengelola pengguna.'
+    );
     error.statusCode = 403;
     throw error;
   }
 
   return {
     user,
-    profile
+    profile,
+    SUPABASE_URL,
+    SUPABASE_SECRET_KEY
   };
 }
 
 
-async function getAllUsers() {
-  const {
-    SUPABASE_URL,
-    SUPABASE_SECRET_KEY
-  } = process.env;
-
+async function getAllUsers(SUPABASE_URL, SUPABASE_SECRET_KEY) {
   // Ambil user dari Supabase Auth
   const authResponse = await fetch(
     `${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`,
@@ -117,7 +128,6 @@ async function getAllUsers() {
     profiles.map(profile => [profile.id, profile])
   );
 
-  // Gabungkan Auth User + Profile
   return authUsers.map(authUser => {
     const profile = profileMap.get(authUser.id);
 
@@ -135,26 +145,250 @@ async function getAllUsers() {
 }
 
 
+async function inviteUser({
+  email,
+  fullName,
+  role,
+  SUPABASE_URL,
+  SUPABASE_SECRET_KEY
+}) {
+  const redirectUrl = encodeURIComponent(INVITE_REDIRECT_URL);
+
+  // Supabase Auth akan membuat user dan mengirim email invitation.
+  // redirect_to diarahkan ke halaman pembuatan password.
+  const inviteResponse = await fetch(
+    `${SUPABASE_URL}/auth/v1/invite?redirect_to=${redirectUrl}`,
+    {
+      method: 'POST',
+      headers: supabaseHeaders(SUPABASE_SECRET_KEY),
+      body: JSON.stringify({
+        email,
+        data: {
+          full_name: fullName,
+          application_role: role
+        }
+      })
+    }
+  );
+
+  const inviteText = await inviteResponse.text();
+
+  let invitePayload = {};
+
+  try {
+    invitePayload = JSON.parse(inviteText);
+  } catch {
+    // Biarkan payload kosong jika Supabase tidak mengirim JSON.
+  }
+
+  if (!inviteResponse.ok) {
+    throw new Error(
+      invitePayload.msg ||
+      invitePayload.message ||
+      invitePayload.error_description ||
+      invitePayload.error ||
+      'Gagal mengirim invitation user.'
+    );
+  }
+
+  return invitePayload;
+}
+
+
+async function createProfile({
+  userId,
+  fullName,
+  role,
+  SUPABASE_URL,
+  SUPABASE_SECRET_KEY
+}) {
+  const profileResponse = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles`,
+    {
+      method: 'POST',
+      headers: {
+        ...supabaseHeaders(SUPABASE_SECRET_KEY),
+        Prefer: 'return=representation'
+      },
+      body: JSON.stringify({
+        id: userId,
+        full_name: fullName,
+        role,
+        is_master: false,
+        is_active: true
+      })
+    }
+  );
+
+  const profileText = await profileResponse.text();
+
+  let profilePayload = {};
+
+  try {
+    profilePayload = JSON.parse(profileText);
+  } catch {
+    // Biarkan payload kosong jika bukan JSON.
+  }
+
+  if (!profileResponse.ok) {
+    throw new Error(
+      profilePayload.message ||
+      profilePayload.hint ||
+      profilePayload.details ||
+      'Gagal membuat profile user.'
+    );
+  }
+
+  return profilePayload[0] || null;
+}
+
+
+async function deleteAuthUser(
+  userId,
+  SUPABASE_URL,
+  SUPABASE_SECRET_KEY
+) {
+  await fetch(
+    `${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(userId)}`,
+    {
+      method: 'DELETE',
+      headers: {
+        apikey: SUPABASE_SECRET_KEY,
+        Authorization: `Bearer ${SUPABASE_SECRET_KEY}`
+      }
+    }
+  );
+}
+
+
 module.exports = async function handler(req, res) {
-  if (req.method !== 'GET') {
+  if (!['GET', 'POST'].includes(req.method)) {
     return res.status(405).json({
       error: 'Method tidak diizinkan.'
     });
   }
 
   try {
-    await getMasterAccount(req);
+    const master = await getMasterAccount(req);
 
-    const users = await getAllUsers();
+    // =========================
+    // GET — daftar semua user
+    // =========================
+    if (req.method === 'GET') {
+      const users = await getAllUsers(
+        master.SUPABASE_URL,
+        master.SUPABASE_SECRET_KEY
+      );
 
-    return res.status(200).json({
-      users
+      return res.status(200).json({
+        users
+      });
+    }
+
+    // =========================
+    // POST — buat/invite user
+    // =========================
+    const body =
+      typeof req.body === 'string'
+        ? JSON.parse(req.body || '{}')
+        : (req.body || {});
+
+    const email = String(body.email || '')
+      .trim()
+      .toLowerCase();
+
+    const fullName = String(body.full_name || '').trim();
+    const role = String(body.role || 'viewer')
+      .trim()
+      .toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'Email wajib diisi.'
+      });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({
+        error: 'Format email tidak valid.'
+      });
+    }
+
+    if (!fullName) {
+      return res.status(400).json({
+        error: 'Nama lengkap wajib diisi.'
+      });
+    }
+
+    if (!ALLOWED_ROLES.includes(role)) {
+      return res.status(400).json({
+        error: 'Role tidak valid.'
+      });
+    }
+
+    // MASTER hanya satu dan tidak dibuat melalui endpoint ini.
+    if (role === 'master') {
+      return res.status(400).json({
+        error: 'Role MASTER tidak dapat diberikan melalui pembuatan user.'
+      });
+    }
+
+    // 1. Buat user Auth + kirim invitation.
+    const invitedUser = await inviteUser({
+      email,
+      fullName,
+      role,
+      SUPABASE_URL: master.SUPABASE_URL,
+      SUPABASE_SECRET_KEY: master.SUPABASE_SECRET_KEY
     });
+
+    const userId = invitedUser.id;
+
+    if (!userId) {
+      throw new Error(
+        'Supabase berhasil memproses invitation tetapi ID user tidak ditemukan.'
+      );
+    }
+
+    // 2. Buat profile aplikasi.
+    try {
+      await createProfile({
+        userId,
+        fullName,
+        role,
+        SUPABASE_URL: master.SUPABASE_URL,
+        SUPABASE_SECRET_KEY: master.SUPABASE_SECRET_KEY
+      });
+    } catch (profileError) {
+      // Jika profile gagal dibuat, hapus user Auth
+      // agar tidak meninggalkan user tanpa profile.
+      await deleteAuthUser(
+        userId,
+        master.SUPABASE_URL,
+        master.SUPABASE_SECRET_KEY
+      );
+
+      throw profileError;
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'User berhasil dibuat dan invitation telah dikirim.',
+      user: {
+        id: userId,
+        email,
+        full_name: fullName,
+        role,
+        is_master: false,
+        is_active: true
+      }
+    });
+
   } catch (error) {
     console.error('User management API error:', error);
 
-    return res.status(error.statusCode || 401).json({
-      error: error.message || 'Akses ditolak.'
+    return res.status(error.statusCode || 500).json({
+      error: error.message || 'Terjadi kesalahan pada User Management.'
     });
   }
 };
