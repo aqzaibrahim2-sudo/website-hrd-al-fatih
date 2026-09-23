@@ -55,7 +55,7 @@
 
       <p class="px-3 text-[10px] uppercase tracking-wider mt-6 mb-2" style="color:#6B6B70;">Sistem</p>
 
-      <a href="#" class="side-link text-red-400 hover:text-red-300 hover:bg-red-500/10" onclick="alert('Fitur Logout akan aktif di Fase 2.'); return false;">
+      <a href="#" class="side-link text-red-400 hover:text-red-300 hover:bg-red-500/10" onclick="HRDAuth.signOut(); return false;">
         <i data-lucide="log-out"></i>
         <span>Logout</span>
       </a>
@@ -79,7 +79,7 @@
 <div class="flex-1 flex flex-col min-w-0">
   
   <header class="bg-[#0F0F11] border-b border-stone-800 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3"><span id="accountName" class="hidden sm:inline text-xs text-stone-300"></span><span id="accountRole" class="hidden sm:inline text-[10px] uppercase text-amber-500"></span>
       <button id="menuToggle" class="md:hidden text-stone-300"><i data-lucide="menu"></i></button>
       <div>
         <h1 class="text-white text-[17px] md:text-lg font-semibold font-display leading-tight truncate">Sistem Informasi Direktorat HR</h1>
@@ -88,11 +88,11 @@
     </div>
     <div class="flex items-center gap-3">
       <span id="todayLabel" class="text-xs text-stone-400 hidden lg:inline-block"></span>
-      <button id="headerCreateProgram" onclick="openModal('modalProgram')" class="program-action btn-gold px-3.5 py-2 rounded-lg text-[12.5px] flex items-center gap-1.5 shadow-sm hidden">
+      <button id="headerCreateProgram" data-role="write" onclick="openModal('modalProgram')" class="program-action btn-gold px-3.5 py-2 rounded-lg text-[12.5px] flex items-center gap-1.5 shadow-sm hidden">
         <i data-lucide="plus" class="w-4 h-4"></i>
         <span>+ Buat Pengajuan Program Baru</span>
       </button>
-      <button id="headerUpdateProgram" onclick="openModal('modalUpdate')" class="program-action bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 px-3.5 py-2 rounded-lg text-[12.5px] flex items-center gap-1.5 hidden">
+      <button id="headerUpdateProgram" data-role="write" onclick="openModal('modalUpdate')" class="program-action bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 px-3.5 py-2 rounded-lg text-[12.5px] flex items-center gap-1.5 hidden">
         <i data-lucide="edit-3" class="w-4 h-4"></i>
         <span>+ Update Program</span>
       </button>
@@ -172,7 +172,7 @@
 
     <section id="viewProgram" class="hidden space-y-6">
     <div class="flex justify-end">
-      <button onclick="openModal('modalProgram')" class="btn-gold px-3.5 py-2 rounded-lg text-[12.5px] flex items-center gap-1.5 shadow-sm">
+      <button data-role="write" onclick="openModal('modalProgram')" class="btn-gold px-3.5 py-2 rounded-lg text-[12.5px] flex items-center gap-1.5 shadow-sm hidden">
         <i data-lucide="plus" class="w-4 h-4"></i><span>+ Buat Pengajuan Program Baru</span>
       </button>
     </div>
@@ -331,6 +331,7 @@
   <span id="toastMsg">Notifikasi</span>
 </div>
 
+<script type="module" src="./auth.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>

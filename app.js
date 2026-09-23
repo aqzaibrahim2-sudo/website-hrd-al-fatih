@@ -2,7 +2,6 @@
 /* =========================================================
    1. CONFIG & STATE
    ========================================================= */
-const GOOGLE_SHEETS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5A0LDMoyqKWxasuXtZrXGWn-BX_8oavCcu_lZoQER1NspjrPgLvzphDQPCR9TJZa9/exec";
 const GOOGLE_SHEETS_TIMEOUT_MS = 20000;
 
 let MASTER_PROGRAM = [];
@@ -37,10 +36,12 @@ async function requestGoogleSheets(options = {}) {
   const timeout = window.setTimeout(() => controller.abort(), GOOGLE_SHEETS_TIMEOUT_MS);
 
   try {
-    const response = await fetch(GOOGLE_SHEETS_WEB_APP_URL, {
+    const token = await window.HRDAuth.getAccessToken();
+    const response = await fetch('/api/sheets', {
       cache: "no-store",
       redirect: "follow",
       ...options,
+      headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
       signal: controller.signal
     });
     const rawBody = await response.text();
@@ -540,12 +541,12 @@ function toast(msg, isError = false) {
 /* =========================================================
    6. INIT
    ========================================================= */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if (window.lucide && typeof lucide.createIcons === 'function') {
     lucide.createIcons();
   }
 
-  fetchDataFromGoogleSheets();
+  try { await window.HRDAuth.ready; fetchDataFromGoogleSheets(); } catch { return; }
 
   document.querySelectorAll('[data-nav]').forEach(link => {
     link.addEventListener('click', (e) => { e.preventDefault(); switchView(link.dataset.nav); });
@@ -576,4 +577,3 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
-
