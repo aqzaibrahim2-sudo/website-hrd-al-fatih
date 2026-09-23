@@ -76,29 +76,82 @@ window.HRDAuth = {
 document.addEventListener('DOMContentLoaded', async () => {
   const loginForm = document.getElementById('loginForm');
   const isResetPasswordPage = document.body.dataset.page === 'reset-password';
+
+  if (isResetPasswordPage) {
+    try {
+      await clientReady;
+    } catch (error) {
+      console.error('Supabase initialization error:', error);
+    }
+    return;
+  }
+
+  loginForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+
+    const button = loginForm.querySelector('button[type="submit"]');
+    const loginError = document.getElementById('loginError');
+
+    button.disabled = true;
+    loginError.textContent = '';
+
+    try {
+      await clientReady;
+
+      const { error } = await client.auth.signInWithPassword({
+        email: loginForm.email.value.trim(),
+        password: loginForm.password.value
+      });
+
+      if (error) {
+        loginError.textContent = 'Email atau password tidak valid.';
+        button.disabled = false;
+        return;
+      }
+
+      window.location.replace('/');
+
+    } catch (error) {
+      console.error('Login error:', error);
+      loginError.textContent = 'Terjadi kesalahan saat login. Silakan coba lagi.';
+      button.disabled = false;
+    }
+  });
+
   try {
     const current = await ready;
 
-    if (isResetPasswordPage) {
-       return;
+    if (loginForm && current) {
+      window.location.replace('/');
+      return;
     }
 
-    if (loginForm && current) return window.location.replace('/');
-    if (!loginForm && !current) return window.location.replace('/login.html');
-    if (!current) return;
+    if (!loginForm && !current) {
+      window.location.replace('/login.html');
+      return;
+    }
 
-    document.getElementById('accountName')?.append(`${current.profile.full_name || current.session.user.email}`);
+    if (!current) {
+      return;
+    }
+
+    document.getElementById('accountName')?.append(
+      `${current.profile.full_name || current.session.user.email}`
+    );
+
     document.getElementById('accountRole')?.append(current.profile.role);
-    document.querySelectorAll('[data-role="write"]').forEach(el => el.classList.toggle('hidden', !can('write')));
+
+    document.querySelectorAll('[data-role="write"]')
+      .forEach(el => el.classList.toggle('hidden', !can('write')));
+
   } catch (error) {
-    if (!loginForm) window.location.replace('/login.html');
+    console.error('Authentication error:', error);
+
+    if (!loginForm) {
+      window.location.replace('/login.html');
+      return;
+    }
+
     document.getElementById('loginError')?.append(error.message);
   }
-  loginForm?.addEventListener('submit', async event => {
-    event.preventDefault();
-    const button = loginForm.querySelector('button[type="submit"]'); button.disabled = true;
-    const { error } = await client.auth.signInWithPassword({ email: loginForm.email.value, password: loginForm.password.value });
-    if (error) { document.getElementById('loginError').textContent = 'Email atau password tidak valid.'; button.disabled = false; return; }
-    window.location.replace('/');
-  });
 });
