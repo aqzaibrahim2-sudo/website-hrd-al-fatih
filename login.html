@@ -1,1 +1,99 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Masuk — Sistem HR Al Fatih</title><script src="https://cdn.tailwindcss.com"></script></head><body class="min-h-screen bg-stone-950 grid place-items-center p-5"><main class="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl"><p class="text-xs font-bold tracking-widest text-amber-700 uppercase">Direktorat SDM / HRD</p><h1 class="mt-3 text-2xl font-bold text-stone-900">Masuk ke Dashboard</h1><p class="mt-2 text-sm text-stone-500">Gunakan akun yang diberikan Admin.</p><form id="loginForm" class="mt-7 space-y-4"><label class="block text-sm font-medium">Email<input name="email" type="email" required class="mt-1 w-full rounded-lg border p-3"></label><label class="block text-sm font-medium">Password<input name="password" type="password" required class="mt-1 w-full rounded-lg border p-3"></label><p id="loginError" class="text-sm text-red-700"></p><button class="w-full rounded-lg bg-amber-600 p-3 font-semibold text-white hover:bg-amber-700">Masuk</button></form></main><script type="module" src="./auth.js"></script></body></html>
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Masuk — Sistem HR Al Fatih</title><script src="https://cdn.tailwindcss.com"></script></head><body class="min-h-screen bg-stone-950 grid place-items-center p-5"><main class="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl"><p class="text-xs font-bold tracking-widest text-amber-700 uppercase">Direktorat SDM / HRD</p><h1 class="mt-3 text-2xl font-bold text-stone-900">Masuk ke Dashboard</h1><p class="mt-2 text-sm text-stone-500">Gunakan akun yang diberikan Admin.</p><form id="loginForm" class="mt-7 space-y-4"><label class="block text-sm font-medium">Email<input name="email" type="email" required class="mt-1 w-full rounded-lg border p-3"></label>
+
+<label class="block text-sm font-medium">
+ Password
+<input name="password" type="password" required class="mt-1 w-full rounded-lg border p-3">
+</label>
+
+<div class="text-right">
+  <button
+    type="button"
+    id="forgotPasswordButton"
+    class="text-sm text-amber-700 hover:text-amber-800 hover:underline"
+  >
+    Lupa password?
+  </button>
+</div>
+
+<div id="forgotPasswordBox" class="hidden rounded-lg bg-stone-50 p-4 border border-stone-200">
+  <p class="text-sm text-stone-600 mb-3">
+    Masukkan email akun Anda. Kami akan mengirimkan link untuk membuat password baru.
+  </p>
+
+  <div class="space-y-3">
+    <input
+      id="resetEmail"
+      type="email"
+      placeholder="Email akun"
+      class="w-full rounded-lg border p-3"
+    >
+
+    <button
+      type="button"
+      id="sendResetButton"
+      class="w-full rounded-lg bg-stone-800 p-3 font-semibold text-white hover:bg-stone-700"
+    >
+      Kirim Link Reset Password
+    </button>
+
+    <p id="resetRequestMessage" class="text-sm"></p>
+  </div>
+</div>
+
+<p id="loginError" class="text-sm text-red-700"></p><button class="w-full rounded-lg bg-amber-600 p-3 font-semibold text-white hover:bg-amber-700">Masuk</button></form></main>
+<script type="module" src="./auth.js"></script>
+
+<script>
+  const forgotPasswordButton = document.getElementById('forgotPasswordButton');
+  const forgotPasswordBox = document.getElementById('forgotPasswordBox');
+  const sendResetButton = document.getElementById('sendResetButton');
+  const resetEmail = document.getElementById('resetEmail');
+  const resetRequestMessage = document.getElementById('resetRequestMessage');
+
+  forgotPasswordButton?.addEventListener('click', () => {
+    forgotPasswordBox.classList.toggle('hidden');
+    resetRequestMessage.textContent = '';
+  });
+
+  sendResetButton?.addEventListener('click', async () => {
+    const email = resetEmail.value.trim();
+
+    resetRequestMessage.textContent = '';
+    resetRequestMessage.className = 'text-sm';
+
+    if (!email) {
+      resetRequestMessage.textContent = 'Masukkan email akun terlebih dahulu.';
+      resetRequestMessage.classList.add('text-red-700');
+      return;
+    }
+
+    sendResetButton.disabled = true;
+    sendResetButton.textContent = 'Mengirim...';
+
+    try {
+      const { error } = await window.HRDAuth.requestPasswordReset(email);
+
+      if (error) {
+        throw error;
+      }
+
+      resetRequestMessage.textContent =
+        'Link reset password sudah dikirim. Silakan periksa email Anda.';
+      resetRequestMessage.classList.add('text-green-700');
+
+    } catch (error) {
+      console.error('Password reset request error:', error);
+
+      resetRequestMessage.textContent =
+        error.message || 'Gagal mengirim link reset password.';
+      resetRequestMessage.classList.add('text-red-700');
+
+    } finally {
+      sendResetButton.disabled = false;
+      sendResetButton.textContent = 'Kirim Link Reset Password';
+    }
+  });
+</script>
+
+</body>
+</html>
