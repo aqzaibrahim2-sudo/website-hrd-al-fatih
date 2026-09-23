@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistem Informasi Direktorat HR — Yayasan Al Fatih Pilar Peradaban</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --obsidian:#0F0F11;
+    --obsidian-2:#17171A;
+    --gold:#D4AF37;
+    --gold-muted:#C5A059;
+    --gold-soft:#F4E9C9;
+    --bg-page:#FAFAFA;
+    --amber:#E5A93C;
+    --amber-bg:#FBF0DE;
+    --crimson:#9C3B45;
+    --crimson-bg:#F8EBEB;
+    --emerald:#2D7A58;
+    --emerald-bg:#EBF5F0;
+    --ink-dark:#1C1917;
+    --ink-soft:#78716C;
+    --card-border:#E4DFCE;
+  }
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-page);
+    color: var(--ink-dark);
+  }
+  h1, h2, h3, .font-display {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .sidebar {
+    background-color: var(--obsidian);
+  }
+  .side-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: 0.5rem;
+    color: #A1A1AA;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+  }
+  .side-link:hover, .side-link.active {
+    background-color: var(--obsidian-2);
+    color: #FFFFFF;
+  }
+  .side-link.active {
+    border-left: 3px solid var(--gold);
+  }
+  .btn-gold {
+    background: linear-gradient(135deg, #D4AF37 0%, #B38F28 100%);
+    color: #0F0F11;
+    font-weight: 600;
+  }
+  .btn-gold:hover {
+    background: linear-gradient(135deg, #E5C048 0%, #C4A039 100%);
+  }
+  .field {
+    border: 1px solid var(--card-border);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background-color: #FFFFFF;
+    outline: none;
+  }
+  .field:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+  }
+  .badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .badge-on-track { background: var(--emerald-bg); color: var(--emerald); }
+  .badge-perlu-perhatian { background: var(--amber-bg); color: var(--amber); }
+  .badge-terlambat { background: var(--crimson-bg); color: var(--crimson); }
+  .badge-selesai { background: #E0F2FE; color: #0369A1; }
+  
+  @media (max-width: 768px) {
+    .sidebar {
+      position: fixed;
+      left: -100%;
+      top: 0;
+      bottom: 0;
+      z-index: 50;
+      transition: left 0.3s ease;
+    }
+    .sidebar.open {
+      left: 0;
+    }
+  }
+</style>
+</head>
+<body class="min-h-screen flex">
+
+<aside id="sidebar" class="sidebar w-64 flex-shrink-0 flex flex-col justify-between h-screen sticky top-0 border-r border-stone-800">
+  <div>
+    <div class="p-5 border-b border-stone-800 flex items-center justify-between">
+      <div>
+        <div class="text-[10px] font-bold tracking-wider text-[#D4AF37] uppercase">Direktorat SDM / HRD</div>
+        <div class="text-sm font-semibold text-white truncate">Al Fatih Pilar Peradaban</div>
+      </div>
+      <button id="menuClose" class="md:hidden text-stone-400"><i data-lucide="x"></i></button>
+    </div>
+
+    <nav class="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+      <p class="px-3 text-[10px] uppercase tracking-wider mb-2" style="color:#6B6B70;">Menu Utama</p>
+      
+      <a href="#" class="side-link active" data-nav="dashboard">
+        <i data-lucide="layout-dashboard"></i>
+        <span>Dashboard</span>
+      </a>
+      
+      <a href="#" class="side-link" data-nav="program">
+        <i data-lucide="briefcase"></i>
+        <span>Program</span>
+      </a>
+
+      <a href="#" class="side-link opacity-60 cursor-not-allowed" onclick="return false;">
+        <i data-lucide="user-check"></i>
+        <span>Absensi</span>
+        <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">Soon</span>
+      </a>
+
+      <a href="#" class="side-link" data-nav="notulensi">
+        <i data-lucide="file-text"></i>
+        <span>Notulensi Rapat</span>
+      </a>
+
+      <a href="#" class="side-link opacity-60 cursor-not-allowed" onclick="return false;">
+        <i data-lucide="wheat"></i>
+        <span>Tunjangan Beras</span>
+        <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">Soon</span>
+      </a>
+
+      <p class="px-3 text-[10px] uppercase tracking-wider mt-6 mb-2" style="color:#6B6B70;">Sistem</p>
+
+      <a href="#" class="side-link text-red-400 hover:text-red-300 hover:bg-red-500/10" onclick="alert('Fitur Logout akan aktif di Fase 2.'); return false;">
+        <i data-lucide="log-out"></i>
+        <span>Logout</span>
+      </a>
+    </nav>
+  </div>
+
+  <div class="p-4 border-t border-stone-800">
+    <div class="p-3 rounded-lg bg-stone-900 border border-stone-800 text-[11px] text-stone-400">
+      <div class="flex items-center justify-between mb-1">
+        <span class="font-medium text-stone-300">Database Status</span>
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+      </div>
+      <div>Google Sheets Connected</div>
+      <button id="syncButton" type="button" onclick="fetchDataFromGoogleSheets()" class="mt-2 text-xs text-[#D4AF37] hover:underline flex items-center gap-1">
+        <i data-lucide="refresh-cw" class="w-3 h-3"></i> Sync Data Sekarang
+      </button>
+    </div>
+  </div>
+</aside>
+
+<div class="flex-1 flex flex-col min-w-0">
+  
+  <header class="bg-[#0F0F11] border-b border-stone-800 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <button id="menuToggle" class="md:hidden text-stone-300"><i data-lucide="menu"></i></button>
+      <div>
+        <h1 class="text-white text-[17px] md:text-lg font-semibold font-display leading-tight truncate">Sistem Informasi Direktorat HR</h1>
+        <p class="text-[12px]" style="color:var(--gold-muted);">Sistem Pemantauan Program Kerja &amp; Kinerja — Yayasan Al Fatih Pilar Peradaban</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="todayLabel" class="text-xs text-stone-400 hidden lg:inline-block"></span>
+      <button id="headerCreateProgram" onclick="openModal('modalProgram')" class="program-action btn-gold px-3.5 py-2 rounded-lg text-[12.5px] flex items-center gap-1.5 shadow-sm hidden">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        <span>+ Buat Pengajuan Program Baru</span>
+      </button>
+      <button id="headerUpdateProgram" onclick="openModal('modalUpdate')" class="program-action bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 px-3.5 py-2 rounded-lg text-[12.5px] flex items-center gap-1.5 hidden">
+        <i data-lucide="edit-3" class="w-4 h-4"></i>
+        <span>+ Update Program</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="p-6 space-y-6 flex-1">
+    <section id="viewDashboard" class="space-y-6">
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div class="p-4 rounded-xl border bg-white shadow-sm" style="border-color:var(--card-border);">
+        <div class="text-[12px] font-medium text-stone-500">Total Program / Issue</div>
+        <div id="statTotal" class="text-2xl font-bold font-display mt-1 text-stone-900">0</div>
+        <div class="text-[11px] text-stone-400 mt-1">Aktif di sistem</div>
+      </div>
+      <div class="p-4 rounded-xl border bg-white shadow-sm" style="border-color:var(--card-border);">
+        <div class="text-[12px] font-medium text-stone-500">Status On Track</div>
+        <div id="statOnTrack" class="text-2xl font-bold font-display mt-1 text-emerald-600">0</div>
+        <div class="text-[11px] text-emerald-600 mt-1">Berjalan sesuai target</div>
+      </div>
+      <div class="p-4 rounded-xl border bg-white shadow-sm" style="border-color:var(--card-border);">
+        <div class="text-[12px] font-medium text-stone-500">Perlu Perhatian / Terlambat</div>
+        <div id="statIssue" class="text-2xl font-bold font-display mt-1 text-amber-600">0</div>
+        <div class="text-[11px] text-amber-600 mt-1">Butuh evaluasi/tindak lanjut</div>
+      </div>
+      <div class="p-4 rounded-xl border bg-white shadow-sm" style="border-color:var(--card-border);">
+        <div class="text-[12px] font-medium text-stone-500">Rata-rata Progress</div>
+        <div id="statAvgProgress" class="text-2xl font-bold font-display mt-1 text-stone-900">0%</div>
+        <div class="text-[11px] text-stone-400 mt-1">Dari seluruh program</div>
+      </div>
+      <div class="p-4 rounded-xl border bg-white shadow-sm" style="border-color:var(--card-border);">
+        <div class="text-[12px] font-medium text-stone-500">Menunggu Approval</div>
+        <div id="statPendingApproval" class="text-2xl font-bold font-display mt-1 text-amber-600">0</div>
+        <div class="text-[11px] text-amber-600 mt-1">Pengajuan program baru</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="p-5 rounded-xl border bg-white shadow-sm space-y-3" style="border-color:var(--card-border);">
+        <h3 class="text-sm font-bold text-stone-800">Status Program Kerja</h3>
+        <div class="h-52 flex items-center justify-center">
+          <canvas id="chartStatus"></canvas>
+        </div>
+      </div>
+      <div class="p-5 rounded-xl border bg-white shadow-sm space-y-3" style="border-color:var(--card-border);">
+        <h3 class="text-sm font-bold text-stone-800">Progress per Departemen</h3>
+        <div class="h-52 flex items-center justify-center">
+          <canvas id="chartDept"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-5 rounded-xl border bg-white shadow-sm space-y-4" style="border-color:var(--card-border);">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div>
+          <h2 class="text-base font-bold text-stone-800">Ringkasan Pengajuan Baru</h2>
+          <p class="text-[12px] text-stone-500">Pengajuan program yang masih menunggu approval</p>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-[12.5px]">
+          <thead class="bg-stone-50 border-b text-stone-600 font-semibold uppercase text-[10.5px] tracking-wider" style="border-color:var(--card-border);">
+            <tr>
+              <th class="py-3 px-3">Nama Program</th>
+              <th class="py-3 px-3">Pengaju / PIC</th>
+              <th class="py-3 px-3">Divisi</th>
+              <th class="py-3 px-3">Tanggal Pengajuan</th>
+            </tr>
+          </thead>
+          <tbody id="tableNewSubmissionBody" class="divide-y divide-stone-100 text-stone-800">
+            </tbody>
+        </table>
+      </div>
+    </div>
+    </section>
+
+    <section id="viewProgram" class="hidden space-y-6">
+    <div class="flex justify-end">
+      <button onclick="openModal('modalProgram')" class="btn-gold px-3.5 py-2 rounded-lg text-[12.5px] flex items-center gap-1.5 shadow-sm">
+        <i data-lucide="plus" class="w-4 h-4"></i><span>+ Buat Pengajuan Program Baru</span>
+      </button>
+    </div>
+    <div class="p-5 rounded-xl border bg-white shadow-sm space-y-4" style="border-color:var(--card-border);">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div><h2 class="text-base font-bold text-stone-800">Daftar Program &amp; Kinerja Divisi</h2><p class="text-[12px] text-stone-500">Kelola pengajuan, update, dan approval program</p></div>
+        <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+          <input type="text" id="searchInput" placeholder="Cari program / PIC..." class="field text-[12.5px] w-full sm:w-48">
+          <select id="filterDept" class="field text-[12.5px] bg-white"><option value="">Semua Dept</option></select>
+          <select id="filterStatus" class="field text-[12.5px] bg-white"><option value="">Semua Status</option><option value="On Track">On Track</option><option value="Perlu Perhatian">Perlu Perhatian</option><option value="Terlambat">Terlambat</option><option value="Selesai">Selesai</option></select>
+        </div>
+      </div>
+      <div class="overflow-x-auto"><table class="w-full text-left text-[12.5px]"><thead class="bg-stone-50 border-b text-stone-600 font-semibold uppercase text-[10.5px] tracking-wider" style="border-color:var(--card-border);"><tr><th class="py-3 px-3">ID / Program</th><th class="py-3 px-3">Dept &amp; PIC</th><th class="py-3 px-3">Tgl Deadline</th><th class="py-3 px-3">Progress</th><th class="py-3 px-3">Status</th><th class="py-3 px-3 text-right">Aksi</th></tr></thead><tbody id="tableProgramBody" class="divide-y divide-stone-100 text-stone-800"></tbody></table></div>
+    </div>
+    <div class="p-5 rounded-xl border bg-white shadow-sm space-y-4" style="border-color:var(--card-border);">
+      <h3 class="text-sm font-bold text-stone-800">Riwayat Update Mingguan Terbaru</h3>
+      <div id="updateList" class="space-y-3">
+        </div>
+    </div>
+    </section>
+
+  </main>
+
+  <footer class="text-center text-[11.5px] py-4" style="color:var(--ink-soft);">
+    Sistem Informasi Direktorat HR — Yayasan Al Fatih Pilar Peradaban · Data tersambung ke Google Sheets via Apps Script Web App
+  </footer>
+</div>
+
+<div id="modalProgram" class="modal-backdrop fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-stone-100">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:#E4DFCE; background-color:#FAFAFA;">
+      <h3 class="font-bold text-[15px] text-stone-800">Tambah Data Utama Baru</h3>
+      <button onclick="closeModal('modalProgram')" class="text-stone-400 hover:text-stone-600"><i data-lucide="x"></i></button>
+    </div>
+    
+    <form id="formProgram" class="p-6 space-y-3.5" onsubmit="handleAddProgram(event)">
+      
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[12px] font-medium block mb-1">Jenis <span class="text-red-500">*</span></label>
+          <select required name="JENIS" id="formJenis" onchange="generateAutoID()" class="field w-full text-[13.5px]">
+            <option value="Program">Program</option>
+            <option value="Project">Project</option>
+            <option value="Issue">Issue</option>
+            <option value="Task">Task</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[12px] font-medium block mb-1">ID Program <span class="text-xs text-stone-400">(Otomatis)</span></label>
+          <input type="text" readonly name="ID_PROGRAM" id="formAutoID" class="field w-full text-[13.5px] bg-stone-100 font-mono font-bold text-stone-700" placeholder="PRG-001">
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[12px] font-medium block mb-1">Nama Program / Kegiatan <span class="text-red-500">*</span></label>
+        <input required name="NAMA_PROGRAM" class="field w-full text-[13.5px]" placeholder="cth. Rekrutmen Guru Cabang Baru">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[12px] font-medium block mb-1">Departemen <span class="text-red-500">*</span></label>
+          <select required name="DEPARTEMEN" id="formProgramDept" class="field w-full text-[13.5px]">
+            <option value="">-- Pilih Departemen --</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[12px] font-medium block mb-1">Penanggung Jawab <span class="text-red-500">*</span></label>
+          <select required name="PIC" id="formProgramPic" class="field w-full text-[13.5px]">
+            <option value="">-- Pilih PIC --</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[12px] font-medium block mb-1">Tanggal Terbit <span class="text-red-500">*</span></label>
+          <input required type="date" name="TANGGAL_TERBIT" id="formProgramTanggalTerbit" class="field w-full text-[13.5px]">
+        </div>
+        <div>
+          <label class="text-[12px] font-medium block mb-1">Tanggal Deadline <span class="text-red-500">*</span></label>
+          <input required type="date" name="TARGET_SELESAI" class="field w-full text-[13.5px]">
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[12px] font-medium block mb-1">Keterangan / Catatan Awal</label>
+        <textarea name="KETERANGAN" rows="2" class="field w-full text-[13.5px]" placeholder="Catatan singkat program..."></textarea>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t" style="border-color:#E4DFCE;">
+        <button type="button" onclick="closeModal('modalProgram')" class="px-4 py-2 rounded-lg text-[13px] font-medium border" style="border-color:#E4DFCE;">Batal</button>
+        <button type="submit" class="btn-gold px-4 py-2 rounded-lg text-[13px]">Simpan Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="modalUpdate" class="modal-backdrop fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-stone-100">
+    <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color:#E4DFCE; background-color:#FAFAFA;">
+      <h3 class="font-bold text-[15px] text-stone-800">Form Input Update Program</h3>
+      <button onclick="closeModal('modalUpdate')" class="text-stone-400 hover:text-stone-600"><i data-lucide="x"></i></button>
+    </div>
+    
+    <form id="formUpdate" class="p-6 space-y-3.5" onsubmit="handleAddUpdate(event)">
+      <div>
+        <label class="text-[12px] font-medium block mb-1">Pilih Program / Issue <span class="text-red-500">*</span></label>
+        <select required name="ID_PROGRAM" id="formUpdateProgramSelect" onchange="calculateProgramStatus()" class="field w-full text-[13.5px]">
+          <option value="">-- Pilih Program yang Disetujui --</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[12px] font-medium block mb-1">Tanggal Update <span class="text-red-500">*</span></label>
+          <input required type="date" name="TANGGAL_UPDATE" id="formUpdateTanggal" onchange="calculateProgramStatus()" class="field w-full text-[13.5px]">
+        </div>
+        <div>
+          <label class="text-[12px] font-medium block mb-1">Tahapan Progress <span class="text-red-500">*</span></label>
+          <select required name="PROGRESS" id="formUpdateProgress" onchange="calculateProgramStatus()" class="field w-full text-[13.5px]">
+            <option value="">-- Pilih Tahapan --</option>
+            <option value="10">10% — Tahapan pengembangan awal</option>
+            <option value="25">25% — Tahapan perencanaan awal</option>
+            <option value="50">50% — Tahapan eksekusi program / sedang dikerjakan</option>
+            <option value="75">75% — Tahapan pemantauan, kontrol dan QC</option>
+            <option value="100">100% — Tahapan selesai</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[12px] font-medium block mb-1">Status Kinerja <span class="text-red-500">*</span></label>
+        <input required readonly name="STATUS" id="formUpdateStatus" class="field w-full text-[13.5px] bg-stone-100 text-stone-600" placeholder="Dihitung otomatis dari deadline dan progress">
+        <p class="text-[10.5px] text-stone-400 mt-1">Status dihitung otomatis berdasarkan tanggal deadline dan tahapan progress.</p>
+      </div>
+
+      <div>
+        <label class="text-[12px] font-medium block mb-1">Kendala / Hambatan</label>
+        <textarea name="KENDALA" rows="2" class="field w-full text-[13.5px]" placeholder="Tuliskan jika ada kendala di lapangan..."></textarea>
+      </div>
+
+      <div>
+        <label class="text-[12px] font-medium block mb-1">Target Mingu Depan</label>
+        <textarea name="TARGET_BERIKUTNYA" rows="2" class="field w-full text-[13.5px]" placeholder="Rencana aksi selanjutnya..."></textarea>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t" style="border-color:#E4DFCE;">
+        <button type="button" onclick="closeModal('modalUpdate')" class="px-4 py-2 rounded-lg text-[13px] font-medium border" style="border-color:#E4DFCE;">Batal</button>
+        <button type="submit" class="btn-gold px-4 py-2 rounded-lg text-[13px]">Kirim Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast" class="fixed bottom-5 right-5 bg-stone-900 text-white px-4 py-3 rounded-xl shadow-xl text-xs font-medium z-50 transform translate-y-10 opacity-0 transition-all duration-300 flex items-center gap-2">
+  <span id="toastMsg">Notifikasi</span>
+</div>
+
+<script>
+/* =========================================================
+   1. CONFIG & STATE
+   ========================================================= */
+const GOOGLE_SHEETS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5A0LDMoyqKWxasuXtZrXGWn-BX_8oavCcu_lZoQER1NspjrPgLvzphDQPCR9TJZa9/exec";
+const GOOGLE_SHEETS_TIMEOUT_MS = 20000;
+
+let MASTER_PROGRAM = [];
+let UPDATE_MINGGUAN = [];
+let MASTER_DEPARTEMEN = [];
+let MASTER_PIC = [];
+
+let chartStatusInstance = null;
+let chartDeptInstance = null;
+let syncInProgress = false;
+const approvalInProgress = new Set();
+
+/* =========================================================
+   2. SYNC WITH GOOGLE SHEETS
+   ========================================================= */
+function setButtonBusy(button, isBusy, busyLabel = "Memproses...") {
+  if (!button) return;
+  if (isBusy) {
+    button.dataset.originalLabel ??= button.innerHTML;
+    button.disabled = true;
+    button.classList.add("opacity-60", "cursor-not-allowed");
+    button.innerHTML = busyLabel;
+  } else {
+    button.disabled = false;
+    button.classList.remove("opacity-60", "cursor-not-allowed");
+    if (button.dataset.originalLabel) button.innerHTML = button.dataset.originalLabel;
+  }
+}
+
+async function requestGoogleSheets(options = {}) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), GOOGLE_SHEETS_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(GOOGLE_SHEETS_WEB_APP_URL, {
+      cache: "no-store",
+      redirect: "follow",
+      ...options,
+      signal: controller.signal
+    });
+    const rawBody = await response.text();
+
+    if (!response.ok) {
+      throw new Error(`Server mengembalikan HTTP ${response.status}.`);
+    }
+
+    try {
+      return JSON.parse(rawBody);
+    } catch {
+      throw new Error("Respons server bukan JSON. Periksa deployment dan izin Apps Script.");
+    }
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error("Koneksi ke Google Sheets melewati batas waktu 20 detik.");
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function fetchDataFromGoogleSheets() {
+  if (syncInProgress) {
+    toast("Sinkronisasi masih berjalan. Mohon tunggu.", true);
+    return;
+  }
+
+  const syncButton = document.getElementById("syncButton");
+  syncInProgress = true;
+  setButtonBusy(syncButton, true, "Menyinkronkan...");
+  try {
+    toast("Menghubungi Google Sheets...");
+    const json = await requestGoogleSheets();
+    if (!json || typeof json !== "object") {
+      throw new Error("Format data dari server tidak valid.");
+    }
+    if (json.success === false) {
+      throw new Error(json.error || "Google Apps Script tidak dapat memuat data.");
+    }
+    
+    MASTER_PROGRAM = json.MASTER_PROGRAM || [];
+    UPDATE_MINGGUAN = json.UPDATE_MINGGUAN || [];
+    MASTER_DEPARTEMEN = json.MASTER_DEPARTEMEN || [];
+    MASTER_PIC = json.MASTER_PIC || [];
+
+    populateFilterOptions();
+    populateMasterOptions();
+    renderAll();
+    toast("Data berhasil disinkronkan.");
+  } catch (err) {
+    console.error("Error Syncing:", err);
+    toast(`Gagal menyinkronkan data: ${err.message}`, true);
+  } finally {
+    syncInProgress = false;
+    setButtonBusy(syncButton, false);
+  }
+}
+
+async function sendDataToGoogleSheets(sheetName, rowData, action = "APPEND_ROW") {
+  try {
+    const json = await requestGoogleSheets({
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ sheet: sheetName, data: rowData, action: action })
+    });
+    if (!json || json.success !== true) {
+      return { success: false, error: json?.error || "Server tidak mengonfirmasi penyimpanan data." };
+    }
+    return json;
+  } catch (err) {
+    console.error("Error Posting:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+/* =========================================================
+   3. AUTO ID & MASTER OPTIONS
+   ========================================================= */
+function generateAutoID() {
+  const jenis = document.getElementById("formJenis") ? document.getElementById("formJenis").value : "Program";
+  let prefix = "PRG";
+  if (jenis === "Project") prefix = "PRJ";
+  if (jenis === "Issue") prefix = "ISU";
+  if (jenis === "Task") prefix = "TSK";
+
+  const existingIDs = MASTER_PROGRAM
+    .map(p => p.ID_PROGRAM)
+    .filter(id => id && id.startsWith(prefix + "-"));
+
+  let maxNum = 0;
+  existingIDs.forEach(id => {
+    const numPart = parseInt(id.split("-")[1], 10);
+    if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
+  });
+
+  const nextNum = String(maxNum + 1).padStart(3, "0");
+  const autoField = document.getElementById("formAutoID");
+  if (autoField) autoField.value = `${prefix}-${nextNum}`;
+}
+
+function populateMasterOptions() {
+  // Dropdown Departemen di Form
+  const deptSelect = document.getElementById("formProgramDept");
+  if (deptSelect) {
+    deptSelect.innerHTML = '<option value="">-- Pilih Departemen --</option>' +
+      MASTER_DEPARTEMEN.map(d => `<option value="${d}">${d}</option>`).join("");
+  }
+
+  // Dropdown PIC di Form
+  const picSelect = document.getElementById("formProgramPic");
+  if (picSelect) {
+    picSelect.innerHTML = '<option value="">-- Pilih PIC --</option>' +
+      MASTER_PIC.map(p => `<option value="${p}">${p}</option>`).join("");
+  }
+
+  // Dropdown Program di Form Update Mingguan
+  const updateProgramSelect = document.getElementById("formUpdateProgramSelect");
+  if (updateProgramSelect) {
+    updateProgramSelect.innerHTML = '<option value="">-- Pilih Program yang Disetujui --</option>' +
+      MASTER_PROGRAM.filter(p => p.AKTIF !== false && p.STATUS_APPROVAL === 'Disetujui').map(p => `<option value="${p.ID_PROGRAM}">[${p.ID_PROGRAM}] ${p.NAMA_PROGRAM}</option>`).join("");
+  }
+}
+
+function populateFilterOptions() {
+  const filterDept = document.getElementById("filterDept");
+  if (!filterDept) return;
+  const curr = filterDept.value;
+  filterDept.innerHTML = '<option value="">Semua Dept</option>' +
+    MASTER_DEPARTEMEN.map(d => `<option value="${d}">${d}</option>`).join("");
+  filterDept.value = curr;
+}
+
+/* =========================================================
+   4. RENDERERS
+   ========================================================= */
+function renderStatCards() {
+  const active = MASTER_PROGRAM.filter(p => p.AKTIF !== false);
+  document.getElementById("statTotal").textContent = active.length;
+  document.getElementById("statOnTrack").textContent = active.filter(p => p.STATUS === "On Track").length;
+  document.getElementById("statIssue").textContent = active.filter(p => p.STATUS === "Perlu Perhatian" || p.STATUS === "Terlambat").length;
+  
+  const avg = active.length ? Math.round(active.reduce((s, p) => s + (p.PROGRESS || 0), 0) / active.length) : 0;
+  document.getElementById("statAvgProgress").textContent = `${avg}%`;
+  document.getElementById("statPendingApproval").textContent = MASTER_PROGRAM.filter(p => p.STATUS_APPROVAL === "Pending").length;
+}
+
+function renderNewSubmissionTable() {
+  const tbody = document.getElementById("tableNewSubmissionBody");
+  if (!tbody) return;
+  const submissions = MASTER_PROGRAM.filter(p => p.STATUS_APPROVAL === "Pending");
+  if (!submissions.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-stone-400">Tidak ada pengajuan baru yang menunggu approval</td></tr>';
+    return;
+  }
+  tbody.innerHTML = submissions.map(p => `
+    <tr class="hover:bg-stone-50 transition">
+      <td class="py-3 px-3 font-bold text-stone-900">${p.NAMA_PROGRAM}</td>
+      <td class="py-3 px-3 text-stone-600">${p.PIC || '-'}</td>
+      <td class="py-3 px-3 text-stone-600">${p.DEPARTEMEN || '-'}</td>
+      <td class="py-3 px-3 text-stone-600">${p.TANGGAL_TERBIT || '-'}</td>
+    </tr>`).join("");
+}
+
+function renderCharts() {
+  if (typeof Chart === 'undefined') return;
+
+  const active = MASTER_PROGRAM.filter(p => p.AKTIF !== false);
+  
+  // Chart Status
+  const statusCounts = { "On Track": 0, "Perlu Perhatian": 0, "Terlambat": 0, "Selesai": 0 };
+  active.forEach(p => { if (statusCounts[p.STATUS] !== undefined) statusCounts[p.STATUS]++; });
+
+  const ctxStatus = document.getElementById("chartStatus");
+  if (ctxStatus) {
+    if (chartStatusInstance) chartStatusInstance.destroy();
+    chartStatusInstance = new Chart(ctxStatus, {
+      type: "doughnut",
+      data: {
+        labels: Object.keys(statusCounts),
+        datasets: [{
+          data: Object.values(statusCounts),
+          backgroundColor: ["#2D7A58", "#E5A93C", "#9C3B45", "#0369A1"]
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+    });
+  }
+
+  // Chart Dept
+  const deptData = {};
+  active.forEach(p => {
+    if (!deptData[p.DEPARTEMEN]) deptData[p.DEPARTEMEN] = { total: 0, count: 0 };
+    deptData[p.DEPARTEMEN].total += (p.PROGRESS || 0);
+    deptData[p.DEPARTEMEN].count++;
+  });
+
+  const deptLabels = Object.keys(deptData);
+  const deptAvgs = deptLabels.map(d => Math.round(deptData[d].total / deptData[d].count));
+
+  const ctxDept = document.getElementById("chartDept");
+  if (ctxDept) {
+    if (chartDeptInstance) chartDeptInstance.destroy();
+    chartDeptInstance = new Chart(ctxDept, {
+      type: "bar",
+      data: {
+        labels: deptLabels,
+        datasets: [{
+          label: "Avg Progress (%)",
+          data: deptAvgs,
+          backgroundColor: "#D4AF37"
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { min: 0, max: 100 } },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+}
+
+function renderProgramTable() {
+  const tbody = document.getElementById("tableProgramBody");
+  if (!tbody) return;
+
+  const search = (document.getElementById("searchInput")?.value || "").toLowerCase();
+  const fDept = document.getElementById("filterDept")?.value || "";
+  const fStatus = document.getElementById("filterStatus")?.value || "";
+
+  const filtered = MASTER_PROGRAM.filter(p => {
+    if (p.AKTIF === false) return false;
+    if (search && !p.NAMA_PROGRAM.toLowerCase().includes(search) && !(p.PIC || "").toLowerCase().includes(search)) return false;
+    if (fDept && p.DEPARTEMEN !== fDept) return false;
+    if (fStatus && p.STATUS !== fStatus) return false;
+    return true;
+  });
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-stone-400">Tidak ada data program ditemukan</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(p => {
+    let badgeClass = "badge-on-track";
+    if (p.STATUS === "Perlu Perhatian") badgeClass = "badge-perlu-perhatian";
+    if (p.STATUS === "Terlambat") badgeClass = "badge-terlambat";
+    if (p.STATUS === "Selesai") badgeClass = "badge-selesai";
+
+    return `
+      <tr class="hover:bg-stone-50 transition">
+        <td class="py-3 px-3">
+          <div class="font-bold text-stone-900">${p.NAMA_PROGRAM}</div>
+          <div class="text-[10.5px] font-mono text-stone-400">${p.ID_PROGRAM} · <span class="text-stone-600 font-sans">${p.JENIS || 'Program'}</span></div>
+        </td>
+        <td class="py-3 px-3">
+          <div class="font-medium text-stone-800">${p.DEPARTEMEN}</div>
+          <div class="text-[11px] text-stone-500">${p.PIC || '-'}</div>
+        </td>
+        <td class="py-3 px-3 text-stone-600">${p.TARGET_SELESAI || '-'}</td>
+        <td class="py-3 px-3">
+          <div class="flex items-center gap-2">
+            <div class="w-16 bg-stone-200 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-amber-500 h-full" style="width:${p.PROGRESS || 0}%"></div>
+            </div>
+            <span class="font-bold text-[11.5px]">${p.PROGRESS || 0}%</span>
+          </div>
+        </td>
+        <td class="py-3 px-3"><span class="badge ${badgeClass}">${p.STATUS}</span></td>
+        <td class="py-3 px-3 text-right">
+          ${p.STATUS_APPROVAL === 'Pending' ? `
+            <div class="flex justify-end gap-2">
+              <button onclick="approveProgram('${p.ID_PROGRAM}')" class="text-[11px] text-emerald-700 font-semibold hover:underline">Setujui</button>
+              <button onclick="rejectProgram('${p.ID_PROGRAM}')" class="text-[11px] text-red-700 font-semibold hover:underline">Tolak</button>
+            </div>` : p.STATUS_APPROVAL === 'Ditolak' ? `<span class="text-[11px] text-red-600 font-semibold">Ditolak</span>` : `<button onclick="quickUpdate('${p.ID_PROGRAM}')" class="text-[11px] text-amber-700 font-semibold hover:underline">+ Update</button>`}
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function renderUpdateList() {
+  const container = document.getElementById("updateList");
+  if (!container) return;
+
+  const sorted = [...UPDATE_MINGGUAN].reverse().slice(0, 5);
+  if (!sorted.length) {
+    container.innerHTML = `<div class="text-center py-4 text-xs text-stone-400">Belum ada catatan update mingguan</div>`;
+    return;
+  }
+
+  container.innerHTML = sorted.map(u => {
+    const prog = MASTER_PROGRAM.find(p => p.ID_PROGRAM === u.ID_PROGRAM);
+    return `
+      <div class="p-3.5 rounded-lg border border-stone-200 bg-stone-50/50 space-y-1">
+        <div class="flex items-center justify-between">
+          <div class="font-semibold text-stone-800 text-[13px]">${prog ? prog.NAMA_PROGRAM : u.ID_PROGRAM}</div>
+          <div class="text-[11px] text-stone-400">${u.TANGGAL_UPDATE}</div>
+        </div>
+        <div class="text-[12px] text-stone-600">Progress: <b>${u.PROGRESS}%</b> (${u.STATUS})</div>
+        ${u.KENDALA ? `<div class="text-[11.5px] text-red-600"><b>Kendala:</b> ${u.KENDALA}</div>` : ''}
+        ${u.TARGET_BERIKUTNYA ? `<div class="text-[11.5px] text-stone-500"><b>Rencana:</b> ${u.TARGET_BERIKUTNYA}</div>` : ''}
+      </div>
+    `;
+  }).join("");
+}
+
+function renderAll() {
+  renderStatCards();
+  renderCharts();
+  renderNewSubmissionTable();
+  renderProgramTable();
+  renderUpdateList();
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+}
+
+/* =========================================================
+   5. ACTIONS & HANDLERS
+   ========================================================= */
+async function handleAddProgram(e) {
+  e.preventDefault();
+  const form = e.target;
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData.entries());
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  setButtonBusy(submitButton, true, "Menyimpan...");
+  toast("Menyimpan program baru...");
+  const res = await sendDataToGoogleSheets("MASTER_PROGRAM", data);
+
+  if (res.success) {
+    MASTER_PROGRAM.push({
+      ...data,
+      PROGRESS: 0,
+      STATUS: "On Track",
+      AKTIF: true,
+      STATUS_APPROVAL: "Pending"
+    });
+    renderAll();
+    closeModal("modalProgram");
+    form.reset();
+    toast("Program baru berhasil disimpan.");
+  } else {
+    toast(`Gagal menyimpan program: ${res.error || "terjadi kesalahan."}`, true);
+  }
+  setButtonBusy(submitButton, false);
+}
+
+async function handleAddUpdate(e) {
+  e.preventDefault();
+  calculateProgramStatus();
+  const form = e.target;
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData.entries());
+
+  if (!data.STATUS) {
+    toast("Pilih program, tanggal update, dan tahapan progress terlebih dahulu.", true);
+    return;
+  }
+
+  data.ID_UPDATE = "UPD-" + Date.now();
+  data.PROGRESS = parseInt(data.PROGRESS, 10) || 0;
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  setButtonBusy(submitButton, true, "Menyimpan...");
+  toast("Mengirim update mingguan...");
+  const res = await sendDataToGoogleSheets("UPDATE_MINGGUAN", data);
+
+  if (res.success) {
+    UPDATE_MINGGUAN.push(data);
+    const prog = MASTER_PROGRAM.find(p => p.ID_PROGRAM === data.ID_PROGRAM);
+    if (prog) {
+      prog.PROGRESS = data.PROGRESS;
+      prog.STATUS = data.STATUS;
+    }
+    renderAll();
+    closeModal("modalUpdate");
+    form.reset();
+    toast("Update mingguan berhasil dicatat.");
+  } else {
+    toast(`Gagal mengirim update: ${res.error || "terjadi kesalahan."}`, true);
+  }
+  setButtonBusy(submitButton, false);
+}
+
+function quickUpdate(idProgram) {
+  openModal('modalUpdate');
+  const sel = document.getElementById("formUpdateProgramSelect");
+  if (sel) sel.value = idProgram;
+}
+
+function calculateProgramStatus() {
+  const programId = document.getElementById('formUpdateProgramSelect')?.value;
+  const progress = Number(document.getElementById('formUpdateProgress')?.value);
+  const statusField = document.getElementById('formUpdateStatus');
+  if (!statusField) return;
+
+  if (!programId || !progress) {
+    statusField.value = '';
+    return;
+  }
+  if (progress === 100) {
+    statusField.value = 'Selesai';
+    return;
+  }
+
+  const program = MASTER_PROGRAM.find(p => p.ID_PROGRAM === programId);
+  if (!program?.TARGET_SELESAI) {
+    statusField.value = 'On Track';
+    return;
+  }
+  const deadline = new Date(`${program.TARGET_SELESAI}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysUntilDeadline = Math.round((deadline - today) / 86400000);
+
+  if (daysUntilDeadline < 0) statusField.value = 'Terlambat';
+  else if (daysUntilDeadline < 2) statusField.value = 'Perlu Perhatian';
+  else statusField.value = 'On Track';
+}
+
+async function updateApproval(idProgram, action) {
+  if (approvalInProgress.has(idProgram)) {
+    toast("Proses approval untuk program ini masih berjalan.", true);
+    return;
+  }
+  approvalInProgress.add(idProgram);
+  const label = action === 'APPROVE_PROGRAM' ? 'menyetujui' : 'menolak';
+  toast(`Memproses ${label} pengajuan...`);
+  const res = await sendDataToGoogleSheets('MASTER_PROGRAM', { ID_PROGRAM: idProgram }, action);
+  if (res.success) {
+    const program = MASTER_PROGRAM.find(p => p.ID_PROGRAM === idProgram);
+    if (program) program.STATUS_APPROVAL = res.status || (action === 'APPROVE_PROGRAM' ? 'Disetujui' : 'Ditolak');
+    renderAll();
+    toast(`Pengajuan berhasil ${action === 'APPROVE_PROGRAM' ? 'disetujui' : 'ditolak'}.`);
+  } else {
+    toast(`Gagal memproses approval: ${res.error || 'terjadi kesalahan.'}`, true);
+  }
+  approvalInProgress.delete(idProgram);
+}
+
+function approveProgram(idProgram) { updateApproval(idProgram, 'APPROVE_PROGRAM'); }
+function rejectProgram(idProgram) { updateApproval(idProgram, 'REJECT_PROGRAM'); }
+
+function switchView(view) {
+  const isDashboard = view === 'dashboard';
+  document.getElementById('viewDashboard')?.classList.toggle('hidden', !isDashboard);
+  document.getElementById('viewProgram')?.classList.toggle('hidden', isDashboard);
+  document.querySelectorAll('[data-nav]').forEach(link => link.classList.toggle('active', link.dataset.nav === view));
+  document.querySelectorAll('.program-action').forEach(button => button.classList.toggle('hidden', isDashboard));
+  document.getElementById('sidebar')?.classList.remove('open');
+}
+
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove("hidden");
+  el.classList.add("flex");
+  
+  const today = new Date().toISOString().split('T')[0];
+  if (id === 'modalProgram') {
+    const tglInput = document.getElementById('formProgramTanggalTerbit');
+    if (tglInput) tglInput.value = today;
+    generateAutoID();
+  }
+  if (id === 'modalUpdate') {
+    const tglUp = document.getElementById('formUpdateTanggal');
+    if (tglUp) tglUp.value = today;
+  }
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add("hidden");
+  el.classList.remove("flex");
+}
+
+function toast(msg, isError = false) {
+  const t = document.getElementById("toast");
+  const tm = document.getElementById("toastMsg");
+  if (!t || !tm) return;
+  
+  tm.textContent = msg;
+  t.style.backgroundColor = isError ? "#9C3B45" : "#0F0F11";
+  t.classList.remove("translate-y-10", "opacity-0");
+  
+  setTimeout(() => {
+    t.classList.add("translate-y-10", "opacity-0");
+  }, 3000);
+}
+
+/* =========================================================
+   6. INIT
+   ========================================================= */
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+
+  fetchDataFromGoogleSheets();
+
+  document.querySelectorAll('[data-nav]').forEach(link => {
+    link.addEventListener('click', (e) => { e.preventDefault(); switchView(link.dataset.nav); });
+  });
+
+  document.getElementById("searchInput")?.addEventListener("input", renderProgramTable);
+  document.getElementById("filterDept")?.addEventListener("change", renderProgramTable);
+  document.getElementById("filterStatus")?.addEventListener("change", renderProgramTable);
+
+  document.getElementById("menuToggle")?.addEventListener("click", () => {
+    document.getElementById("sidebar")?.classList.toggle("open");
+  });
+  document.getElementById("menuClose")?.addEventListener("click", () => {
+    document.getElementById("sidebar")?.classList.remove("open");
+  });
+
+  const todayLabel = document.getElementById("todayLabel");
+  if (todayLabel) {
+    todayLabel.textContent = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+  }
+
+  [...document.querySelectorAll(".modal-backdrop")].forEach(backdrop => {
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) {
+        backdrop.classList.add("hidden");
+        backdrop.classList.remove("flex");
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>
