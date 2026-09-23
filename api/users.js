@@ -145,57 +145,7 @@ async function getAllUsers(SUPABASE_URL, SUPABASE_SECRET_KEY) {
 }
 
 
-async function inviteUser({
-  email,
-  fullName,
-  role,
-  SUPABASE_URL,
-  SUPABASE_SECRET_KEY
-}) {
-  const redirectUrl = encodeURIComponent(INVITE_REDIRECT_URL);
-
-  // Supabase Auth akan membuat user dan mengirim email invitation.
-  // redirect_to diarahkan ke halaman pembuatan password.
-  const inviteResponse = await fetch(
-    `${SUPABASE_URL}/auth/v1/invite?redirect_to=${redirectUrl}`,
-    {
-      method: 'POST',
-      headers: supabaseHeaders(SUPABASE_SECRET_KEY),
-      body: JSON.stringify({
-        email,
-        data: {
-          full_name: fullName,
-          application_role: role
-        }
-      })
-    }
-  );
-
-  const inviteText = await inviteResponse.text();
-
-  let invitePayload = {};
-
-  try {
-    invitePayload = JSON.parse(inviteText);
-  } catch {
-    // Biarkan payload kosong jika Supabase tidak mengirim JSON.
-  }
-
-  if (!inviteResponse.ok) {
-    throw new Error(
-      invitePayload.msg ||
-      invitePayload.message ||
-      invitePayload.error_description ||
-      invitePayload.error ||
-      'Gagal mengirim invitation user.'
-    );
-  }
-
-  return invitePayload;
-}
-
-
-async function createProfile({
+async function updateProfile({
   userId,
   fullName,
   role,
@@ -203,15 +153,14 @@ async function createProfile({
   SUPABASE_SECRET_KEY
 }) {
   const profileResponse = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles`,
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`,
     {
-      method: 'POST',
+      method: 'PATCH',
       headers: {
         ...supabaseHeaders(SUPABASE_SECRET_KEY),
         Prefer: 'return=representation'
       },
       body: JSON.stringify({
-        id: userId,
         full_name: fullName,
         role,
         is_master: false,
@@ -222,7 +171,7 @@ async function createProfile({
 
   const profileText = await profileResponse.text();
 
-  let profilePayload = {};
+  let profilePayload = [];
 
   try {
     profilePayload = JSON.parse(profileText);
@@ -235,11 +184,17 @@ async function createProfile({
       profilePayload.message ||
       profilePayload.hint ||
       profilePayload.details ||
-      'Gagal membuat profile user.'
+      'Gagal memperbarui profile user.'
     );
   }
 
-  return profilePayload[0] || null;
+  if (!profilePayload[0]) {
+    throw new Error(
+      'User Auth berhasil dibuat, tetapi profile tidak ditemukan.'
+    );
+  }
+
+  return profilePayload[0];
 }
 
 
@@ -352,14 +307,14 @@ module.exports = async function handler(req, res) {
 
     // 2. Buat profile aplikasi.
     try {
-      await createProfile({
-        userId,
-        fullName,
-        role,
-        SUPABASE_URL: master.SUPABASE_URL,
-        SUPABASE_SECRET_KEY: master.SUPABASE_SECRET_KEY
-      });
-    } catch (profileError) {
+  	await updateProfile({
+    	 userId,
+    	 fullName,
+    	 role,
+    	 SUPABASE_URL: master.SUPABASE_URL,
+    	 SUPABASE_SECRET_KEY: master.SUPABASE_SECRET_KEY
+  	});
+      } catch (profileError) {
       // Jika profile gagal dibuat, hapus user Auth
       // agar tidak meninggalkan user tanpa profile.
       await deleteAuthUser(
