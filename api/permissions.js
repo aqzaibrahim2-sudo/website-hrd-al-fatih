@@ -85,11 +85,13 @@ function buildPermissionRows(role, overrides, permissionRows) {
   const idByKey = new Map((permissionRows || []).map(item => [item.code, item.id]));
   return PERMISSION_DEFINITIONS.map(def => {
     const defaultAllowed = def.roles.includes(role);
-    const overrideItem = map.get(def.key);
+    const permissionId = idByKey.get(def.key);
+    // user_permissions is keyed by permission_id, not by the permission code.
+    const overrideItem = permissionId == null ? null : map.get(String(permissionId));
     const override = overrideItem ? overrideItem.allowed === true : null;
     return {
       permission_key: def.key,
-      permission_id: idByKey.get(def.key) ?? null,
+      permission_id: permissionId ?? null,
       label: def.label,
       default_allowed: defaultAllowed,
       override,
