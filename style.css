@@ -89,3 +89,101 @@
     }
   }
 
+
+
+/* Revisi 2: penyempurnaan tampilan mobile tanpa mengubah layout desktop */
+@media (max-width: 767px) {
+  html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+  body { min-width: 0; }
+  body > div.flex-1 { width: 100%; min-width: 0; }
+
+  #sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(84vw, 320px);
+    max-width: calc(100vw - 48px);
+    height: 100dvh;
+    min-height: 100vh;
+    left: 0;
+    transform: translateX(-105%);
+    z-index: 50;
+    transition: transform .25s ease;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  #sidebar.open { left: 0; transform: translateX(0); }
+  body.sidebar-open { overflow: hidden; }
+  body.sidebar-open::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 15, 17, .56);
+    z-index: 40;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    padding: 12px 14px !important;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  header > div:first-child { min-width: 0; flex: 1 1 auto; gap: 9px; }
+  header > div:first-child > div { min-width: 0; }
+  header h1 { font-size: 15px !important; white-space: normal; }
+  header p { font-size: 10px !important; line-height: 1.45; }
+  header > div:last-child { flex: 0 0 auto; }
+  #menuToggle { flex: 0 0 auto; padding: 5px; }
+
+  main { padding: 14px !important; width: 100%; min-width: 0; }
+  main > section, main > section > div { min-width: 0; }
+  main .grid { min-width: 0; }
+  main .grid > * { min-width: 0; }
+  main .rounded-xl, main .rounded-2xl { max-width: 100%; }
+  main .p-5 { padding: 14px; }
+  main .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 16px; }
+
+  /* Statistik: dua kolom pada ponsel, satu kolom pada layar sangat sempit */
+  #viewDashboard > .grid:first-child { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  #viewDashboard > .grid:first-child > div { padding: 12px; }
+  #viewDashboard > .grid:first-child > div:first-child { grid-column: 1 / -1; }
+  #viewDashboard > .grid:first-child .text-\[12px\] { font-size: 11px; line-height: 1.4; }
+  #viewDashboard > .grid:first-child .text-2xl { font-size: 1.45rem; }
+  #viewDashboard > .grid:nth-child(2) { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  #viewDashboard canvas { max-width: 100%; }
+
+  /* Tabel tetap utuh dan dapat digeser horizontal, bukan mengecilkan kolom sampai teks patah */
+  .overflow-x-auto { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .overflow-x-auto table { min-width: 620px; }
+  #viewUsers .overflow-x-auto table { min-width: 700px; }
+
+  #viewProgram .flex.flex-wrap { align-items: stretch; }
+  #searchInput, #filterDept, #filterStatus { width: 100%; min-width: 0; }
+
+  .modal-backdrop, body > div.fixed.inset-0 {
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom)) !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-backdrop > div, body > div.fixed.inset-0 > div {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .modal-backdrop .grid.grid-cols-2 { grid-template-columns: minmax(0, 1fr); }
+  .modal-backdrop input, .modal-backdrop select, .modal-backdrop textarea,
+  body > div.fixed.inset-0 input, body > div.fixed.inset-0 select { min-width: 0; max-width: 100%; }
+  .modal-backdrop button, body > div.fixed.inset-0 button { min-height: 42px; }
+
+  footer { padding: 12px 14px !important; line-height: 1.5; }
+}
+
+@media (max-width: 380px) {
+  #viewDashboard > .grid:first-child { grid-template-columns: minmax(0, 1fr); }
+  #viewDashboard > .grid:first-child > div:first-child { grid-column: auto; }
+  header p { max-width: 230px; }
+}

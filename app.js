@@ -1086,18 +1086,31 @@ document.addEventListener("DOMContentLoaded", async () => {
 }
 
   document.querySelectorAll('[data-nav]').forEach(link => {
-    link.addEventListener('click', (e) => { e.preventDefault(); switchView(link.dataset.nav); });
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchView(link.dataset.nav);
+      closeMobileMenu();
+    });
   });
 
   document.getElementById("searchInput")?.addEventListener("input", renderProgramTable);
   document.getElementById("filterDept")?.addEventListener("change", renderProgramTable);
   document.getElementById("filterStatus")?.addEventListener("change", renderProgramTable);
 
+  const sidebar = document.getElementById("sidebar");
+  const closeMobileMenu = () => {
+    sidebar?.classList.remove("open");
+    document.body.classList.remove("sidebar-open");
+  };
   document.getElementById("menuToggle")?.addEventListener("click", () => {
-    document.getElementById("sidebar")?.classList.toggle("open");
+    const isOpen = sidebar?.classList.toggle("open") || false;
+    document.body.classList.toggle("sidebar-open", isOpen);
   });
-  document.getElementById("menuClose")?.addEventListener("click", () => {
-    document.getElementById("sidebar")?.classList.remove("open");
+  document.getElementById("menuClose")?.addEventListener("click", closeMobileMenu);
+  document.body.addEventListener("click", (event) => {
+    if (!document.body.classList.contains("sidebar-open")) return;
+    if (event.target.closest("#sidebar") || event.target.closest("#menuToggle")) return;
+    closeMobileMenu();
   });
   
   document.getElementById('userSearchInput')?.addEventListener('input',
