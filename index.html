@@ -310,34 +310,34 @@
       <p class="text-[12px] text-stone-500">Atur permission berdasarkan role dan override khusus per user.</p>
     </div>
 
-    <div class="p-5 rounded-xl border bg-white shadow-sm space-y-5" style="border-color:var(--card-border);">
-      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div class="w-full sm:max-w-md">
+    <div class="p-5 rounded-xl border bg-white shadow-sm" style="border-color:var(--card-border);">
+      <div class="flex flex-col gap-4">
+        <div>
           <label for="permissionUserSelect" class="text-[12px] font-medium block mb-1">Pilih User</label>
-          <select id="permissionUserSelect" class="field w-full text-[13px]">
-            <option value="">Memuat user...</option>
+          <select id="permissionUserSelect" class="field w-full sm:w-[420px] text-[13.5px] bg-white">
+            <option value="">-- Pilih User --</option>
           </select>
         </div>
-        <div id="permissionUserSummary" class="text-[11px] text-stone-500"></div>
-      </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-[12.5px]">
-          <thead class="bg-stone-50 border-b text-stone-600 font-semibold uppercase text-[10.5px] tracking-wider" style="border-color:var(--card-border);">
-            <tr>
-              <th class="py-3 px-3">Permission</th>
-              <th class="py-3 px-3">Default Role</th>
-              <th class="py-3 px-3">Override User</th>
-            </tr>
-          </thead>
-          <tbody id="permissionTableBody" class="divide-y divide-stone-100 text-stone-800">
-            <tr><td colspan="3" class="py-8 text-center text-stone-400">Pilih user untuk mengatur permission.</td></tr>
-          </tbody>
-        </table>
-      </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-[12.5px]">
+            <thead class="bg-stone-50 border-b text-stone-600 font-semibold uppercase text-[10.5px] tracking-wider" style="border-color:var(--card-border);">
+              <tr>
+                <th class="py-3 px-3">Permission</th>
+                <th class="py-3 px-3">Default Role</th>
+                <th class="py-3 px-3">Override User</th>
+              </tr>
+            </thead>
+            <tbody id="tablePermissionsBody" class="divide-y divide-stone-100 text-stone-800">
+              <tr><td colspan="3" class="py-8 text-center text-stone-400">Pilih user untuk mengatur permission.</td></tr>
+            </tbody>
+          </table>
+        </div>
 
-      <div class="flex justify-end pt-2 border-t" style="border-color:#E4DFCE;">
-        <button id="buttonSavePermissions" type="button" class="btn-gold px-4 py-2 rounded-lg text-[13px]">Simpan Permission</button>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t" style="border-color:var(--card-border);">
+          <p id="permissionUserHint" class="text-[11px] text-stone-500"></p>
+          <button id="buttonSavePermissions" type="button" class="btn-gold px-4 py-2 rounded-lg text-[12.5px] font-semibold shadow-sm">Simpan Permission</button>
+        </div>
       </div>
     </div>
   </section>

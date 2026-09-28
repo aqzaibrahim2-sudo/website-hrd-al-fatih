@@ -1210,134 +1210,171 @@ function escapeHtml(value) {
    ROLE & PERMISSION — STEP 5F
    ========================================================= */
 
-let permissionManagementData = null;
+let permissionDefinitions = [];
+let permissionUsers = [];
+let selectedPermissionUserId = null;
 
-async function loadPermissionManagement() {
-  if (!window.HRDAuth?.isMaster?.()) {
-    toast('Hanya MASTER yang dapat mengelola Role & Permission.', true);
+function permissionDefaultLabel(allowed) {
+  return allowed
+    ? '<span class="text-emerald-700 font-semibold">Izinkan</span>'
+    : '<span class="text-stone-400">Tidak diizinkan</span>';
+}
+
+function permissionOverrideOptions(current) {
+  return `
+    <select class="permission-override field text-[12px] w-full sm:w-40 bg-white" data-permission-key="${escapeHtml(current.permission_key)}">
+      <option value="" ${current.override === null ? 'selected' : ''}>Default Role</option>
+      <option value="allow" ${current.override === true ? 'selected' : ''}>Izinkan</option>
+      <option value="deny" ${current.override === false ? 'selected' : ''}>Tolak</option>
+    </select>
+  `;
+}
+
+function renderPermissionTable(rows, user) {
+  const tbody = document.getElementById('tablePermissionsBody');
+  const hint = document.getElementById('permissionUserHint');
+  const saveButton = document.getElementById('buttonSavePermissions');
+  if (!tbody) return;
+
+  if (!user) {
+    tbody.innerHTML = '<tr><td colspan="3" class="py-8 text-center text-stone-400">Pilih user untuk mengatur permission.</td></tr>';
+    if (hint) hint.textContent = '';
+    if (saveButton) saveButton.disabled = true;
     return;
   }
 
+  const isMaster = user.is_master === true || user.role === 'master';
+  if (hint) {
+    hint.textContent = isMaster
+      ? 'Akun MASTER utama memiliki akses penuh dan tidak dapat diubah.'
+      : `Role default: ${String(user.role || 'viewer').toUpperCase()}`;
+  }
+  if (saveButton) saveButton.disabled = isMaster;
+
+  tbody.innerHTML = rows.map(row => `
+    <tr class="hover:bg-stone-50">
+      <td class="py-3 px-3">
+        <div class="font-medium text-stone-800">${escapeHtml(row.label)}</div>
+        <div class="text-[10px] text-stone-400 font-mono">${escapeHtml(row.permission_key)}</div>
+      </td>
+      <td class="py-3 px-3">${permissionDefaultLabel(row.default_allowed)}</td>
+      <td class="py-3 px-3">
+        ${isMaster
+          ? '<span class="text-[11px] text-stone-400">Akun utama</span>'
+          : permissionOverrideOptions(row)}
+      </td>
+    </tr>
+  `).join('');
+
+  if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+}
+
+async function loadPermissionUsers() {
+  const select = document.getElementById('permissionUserSelect');
+  if (!select) return;
+
   try {
-    if (!userManagementData.length) {
-      await loadUserManagement();
+    const token = await window.HRDAuth.getAccessToken();
+    const response = await fetch('/api/users', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || 'Gagal mengambil daftar user.');
+
+    permissionUsers = Array.isArray(payload.users) ? payload.users : [];
+    select.innerHTML = '<option value="">-- Pilih User --</option>' +
+      permissionUsers.map(user => {
+        const label = `${user.full_name || user.email || '-'} — ${String(user.role || 'viewer').toUpperCase()}`;
+        return `<option value="${escapeHtml(user.id)}">${escapeHtml(label)}</option>`;
+      }).join('');
+
+    if (selectedPermissionUserId && permissionUsers.some(u => u.id === selectedPermissionUserId)) {
+      select.value = selectedPermissionUserId;
+    } else {
+      selectedPermissionUserId = null;
+      renderPermissionTable([], null);
     }
-
-    const select = document.getElementById('permissionUserSelect');
-    if (!select) return;
-
-    const users = userManagementData.filter(user => !user.is_master);
-
-    select.innerHTML = users.length
-      ? `<option value="">Pilih user...</option>${users.map(user => `
-          <option value="${escapeHtml(user.id)}">${escapeHtml(user.full_name || user.email || 'User')} — ${escapeHtml(String(user.role || '').toUpperCase())}</option>
-        `).join('')}`
-      : '<option value="">Tidak ada user non-MASTER</option>';
-
-    document.getElementById('permissionTableBody').innerHTML = `
-      <tr><td colspan="3" class="py-8 text-center text-stone-400">Pilih user untuk mengatur permission.</td></tr>
-    `;
-    document.getElementById('permissionUserSummary').textContent = '';
-
   } catch (error) {
-    console.error('loadPermissionManagement error:', error);
-    toast(error.message || 'Gagal memuat Role & Permission.', true);
+    console.error('loadPermissionUsers error:', error);
+    toast(error.message || 'Gagal mengambil daftar user.', true);
   }
 }
 
-async function loadUserPermissions(userId) {
-  if (!userId) {
-    permissionManagementData = null;
-    document.getElementById('permissionTableBody').innerHTML = `
-      <tr><td colspan="3" class="py-8 text-center text-stone-400">Pilih user untuk mengatur permission.</td></tr>
-    `;
-    document.getElementById('permissionUserSummary').textContent = '';
+async function loadPermissionsForUser(userId) {
+  const tbody = document.getElementById('tablePermissionsBody');
+  if (!tbody) return;
+  const user = permissionUsers.find(item => item.id === userId);
+  if (!user) {
+    renderPermissionTable([], null);
     return;
   }
+
+  selectedPermissionUserId = userId;
+  tbody.innerHTML = '<tr><td colspan="3" class="py-8 text-center text-stone-400">Memuat permission...</td></tr>';
 
   try {
     const token = await window.HRDAuth.getAccessToken();
     const response = await fetch(`/api/permissions?user_id=${encodeURIComponent(userId)}`, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store'
+      headers: { Authorization: `Bearer ${token}` }
     });
-
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.error || 'Gagal mengambil permission user.');
-    }
+    if (!response.ok) throw new Error(payload.error || 'Gagal mengambil permission user.');
 
-    permissionManagementData = payload;
-    renderPermissionTable();
-
+    permissionDefinitions = Array.isArray(payload.permissions) ? payload.permissions : [];
+    renderPermissionTable(permissionDefinitions, user);
   } catch (error) {
-    console.error('loadUserPermissions error:', error);
-    toast(error.message || 'Gagal mengambil permission user.', true);
+    console.error('loadPermissionsForUser error:', error);
+    tbody.innerHTML = `<tr><td colspan="3" class="py-8 text-center text-red-500">${escapeHtml(error.message || 'Gagal mengambil permission user.')}</td></tr>`;
+    const saveButton = document.getElementById('buttonSavePermissions');
+    if (saveButton) saveButton.disabled = true;
   }
 }
 
-function renderPermissionTable() {
-  const tbody = document.getElementById('permissionTableBody');
-  const summary = document.getElementById('permissionUserSummary');
-  if (!tbody || !permissionManagementData) return;
-
-  const data = permissionManagementData;
-  summary.textContent = `${data.user.full_name || data.user.id} · Role ${String(data.user.role || '').toUpperCase()}`;
-
-  tbody.innerHTML = Object.entries(data.permissions || {}).map(([key, definition]) => {
-    const roleAllowed = Array.isArray(data.role_defaults) && data.role_defaults.includes(key);
-    const override = data.overrides?.[key] || 'default';
-
-    return `
-      <tr>
-        <td class="py-3 px-3">
-          <div class="font-medium text-stone-800">${escapeHtml(definition.label)}</div>
-          <div class="text-[10.5px] text-stone-400">${escapeHtml(definition.description)}</div>
-        </td>
-        <td class="py-3 px-3">
-          <span class="text-[10px] font-semibold px-2 py-1 rounded ${roleAllowed ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'}">
-            ${roleAllowed ? 'IZIN' : 'TIDAK'}
-          </span>
-        </td>
-        <td class="py-3 px-3">
-          <select class="field text-[12px] permissionOverrideSelect" data-permission-key="${escapeHtml(key)}">
-            <option value="default" ${override === 'default' ? 'selected' : ''}>Default Role</option>
-            <option value="allow" ${override === 'allow' ? 'selected' : ''}>Izinkan</option>
-            <option value="deny" ${override === 'deny' ? 'selected' : ''}>Tolak</option>
-          </select>
-        </td>
-      </tr>
-    `;
-  }).join('');
+async function loadPermissionManagement() {
+  if (!window.HRDAuth?.isMaster?.()) {
+    toast('Hanya MASTER yang dapat mengatur Role & Permission.', true);
+    return;
+  }
+  selectedPermissionUserId = null;
+  const select = document.getElementById('permissionUserSelect');
+  if (select) select.value = '';
+  renderPermissionTable([], null);
+  await loadPermissionUsers();
 }
 
 async function saveUserPermissions() {
   if (!window.HRDAuth?.isMaster?.()) {
-    toast('Hanya MASTER yang dapat mengubah permission.', true);
+    toast('Hanya MASTER yang dapat menyimpan permission.', true);
     return;
   }
-
-  const userId = document.getElementById('permissionUserSelect')?.value;
-  if (!userId || !permissionManagementData) {
+  const user = permissionUsers.find(item => item.id === selectedPermissionUserId);
+  if (!user) {
     toast('Pilih user terlebih dahulu.', true);
     return;
   }
+  if (user.is_master === true || user.role === 'master') {
+    toast('Akun MASTER utama tidak dapat diubah.', true);
+    return;
+  }
+
+  const overrides = {};
+  document.querySelectorAll('.permission-override[data-permission-key]').forEach(select => {
+    const key = select.dataset.permissionKey;
+    if (select.value === 'allow') overrides[key] = true;
+    else if (select.value === 'deny') overrides[key] = false;
+    else overrides[key] = null;
+  });
 
   const button = document.getElementById('buttonSavePermissions');
-  const originalText = button?.textContent;
+  const original = button?.innerHTML;
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Menyimpan...';
+  }
 
   try {
-    if (button) {
-      button.disabled = true;
-      button.textContent = 'Menyimpan...';
-    }
-
-    const overrides = {};
-    document.querySelectorAll('.permissionOverrideSelect').forEach(select => {
-      overrides[select.dataset.permissionKey] = select.value;
-    });
-
     const token = await window.HRDAuth.getAccessToken();
     const response = await fetch('/api/permissions', {
       method: 'PUT',
@@ -1345,28 +1382,25 @@ async function saveUserPermissions() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ user_id: userId, overrides })
+      body: JSON.stringify({ user_id: selectedPermissionUserId, overrides })
     });
-
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.error || 'Gagal menyimpan permission.');
-    }
-
-    permissionManagementData = payload;
-    renderPermissionTable();
-    toast('Permission user berhasil disimpan.');
-
+    if (!response.ok) throw new Error(payload.error || 'Gagal menyimpan permission.');
+    toast('Permission berhasil disimpan.');
+    await loadPermissionsForUser(selectedPermissionUserId);
   } catch (error) {
     console.error('saveUserPermissions error:', error);
     toast(error.message || 'Gagal menyimpan permission.', true);
   } finally {
     if (button) {
       button.disabled = false;
-      button.textContent = originalText || 'Simpan Permission';
+      button.innerHTML = original || 'Simpan Permission';
+      const current = permissionUsers.find(item => item.id === selectedPermissionUserId);
+      if (current?.is_master === true || current?.role === 'master') button.disabled = true;
     }
   }
 }
+
 
 /* =========================================================
    6. INIT
@@ -1421,7 +1455,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   );
 
   document.getElementById('permissionUserSelect')?.addEventListener('change', (event) => {
-    loadUserPermissions(event.target.value);
+    const userId = event.target.value;
+    if (!userId) {
+      selectedPermissionUserId = null;
+      renderPermissionTable([], null);
+      return;
+    }
+    loadPermissionsForUser(userId);
   });
 
   document.getElementById('buttonSavePermissions')?.addEventListener('click', saveUserPermissions);
