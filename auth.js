@@ -32,6 +32,11 @@ const ready = (async () => {
 
   if (error || !profile) throw new Error('Profil akun belum tersedia.');
 
+  if (!profile.is_active) {
+    await client.auth.signOut();
+    throw new Error('Akun Anda sedang tidak aktif. Hubungi MASTER untuk mengaktifkan kembali.');
+  }
+
   account = { session, profile };
   return account;
 })();
@@ -109,6 +114,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (error) {
         loginError.textContent = 'Email atau password tidak valid.';
+        button.disabled = false;
+        return;
+      }
+
+      const { data: { user: signedInUser } } = await client.auth.getUser();
+      const { data: profile, error: profileError } = await client
+        .from('profiles')
+        .select('is_active')
+        .eq('id', signedInUser?.id || '')
+        .single();
+
+      if (profileError || !profile) {
+        await client.auth.signOut();
+        loginError.textContent = 'Profil akun belum tersedia.';
+        button.disabled = false;
+        return;
+      }
+
+      if (!profile.is_active) {
+        await client.auth.signOut();
+        loginError.textContent = 'Akun Anda sedang tidak aktif. Hubungi MASTER untuk mengaktifkan kembali.';
         button.disabled = false;
         return;
       }

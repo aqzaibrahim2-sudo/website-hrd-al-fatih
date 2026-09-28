@@ -391,11 +391,17 @@ module.exports = async function handler(
       const userId =
         String(body.id || '').trim();
 
+      const hasFullName = Object.prototype.hasOwnProperty.call(body, 'full_name');
+      const hasRole = Object.prototype.hasOwnProperty.call(body, 'role');
+      const hasIsActive = Object.prototype.hasOwnProperty.call(body, 'is_active');
+
       const fullName =
         String(body.full_name || '').trim();
 
       const role =
         String(body.role || '').trim().toLowerCase();
+
+      const requestedIsActive = body.is_active;
 
       if (!userId) {
         return res.status(400).json({
@@ -403,15 +409,29 @@ module.exports = async function handler(
         });
       }
 
-      if (!fullName) {
+      if (hasIsActive && typeof requestedIsActive !== 'boolean') {
+        return res.status(400).json({
+          error: 'Status aktif tidak valid.'
+        });
+      }
+
+      const isProfileEdit = hasFullName || hasRole;
+
+      if (isProfileEdit && !fullName) {
         return res.status(400).json({
           error: 'Nama lengkap wajib diisi.'
         });
       }
 
-      if (!ALLOWED_ROLES.includes(role)) {
+      if (isProfileEdit && !ALLOWED_ROLES.includes(role)) {
         return res.status(400).json({
           error: 'Role tidak valid.'
+        });
+      }
+
+      if (!isProfileEdit && !hasIsActive) {
+        return res.status(400).json({
+          error: 'Tidak ada perubahan user yang dikirim.'
         });
       }
 
@@ -455,9 +475,9 @@ module.exports = async function handler(
       const updatedProfile =
         await updateProfile({
           userId,
-          fullName,
-          role,
-          isActive: targetProfile.is_active !== false,
+          fullName: isProfileEdit ? fullName : targetProfile.full_name,
+          role: isProfileEdit ? role : targetProfile.role,
+          isActive: hasIsActive ? requestedIsActive : targetProfile.is_active !== false,
           SUPABASE_URL: master.SUPABASE_URL,
           SUPABASE_SECRET_KEY: master.SUPABASE_SECRET_KEY
         });

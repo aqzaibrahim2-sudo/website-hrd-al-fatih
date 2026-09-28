@@ -659,6 +659,69 @@ function toast(msg, isError = false) {
 let userManagementData = [];
 let editingUserId = null;
 
+async function handleToggleUserStatus(userId) {
+  if (!window.HRDAuth?.isMaster?.()) {
+    toast("Hanya MASTER yang dapat mengubah status user.", true);
+    return;
+  }
+
+  const user = userManagementData.find(item => item.id === userId);
+
+  if (!user) {
+    toast("Data user tidak ditemukan.", true);
+    return;
+  }
+
+  if (user.is_master) {
+    toast("Akun MASTER utama tidak dapat dinonaktifkan.", true);
+    return;
+  }
+
+  const nextStatus = user.is_active === false;
+  const actionText = nextStatus ? "mengaktifkan" : "menonaktifkan";
+
+  if (!window.confirm(`Apakah Anda yakin ingin ${actionText} user \"${user.full_name || user.email}\"?`)) {
+    return;
+  }
+
+  try {
+    const accessToken = await window.HRDAuth.getAccessToken();
+
+    if (!accessToken) {
+      throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
+    }
+
+    const response = await fetch("/api/users", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        id: user.id,
+        is_active: nextStatus
+      })
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        result?.error ||
+        result?.message ||
+        `Gagal ${actionText} user.`
+      );
+    }
+
+    toast(nextStatus ? "User berhasil diaktifkan." : "User berhasil dinonaktifkan.");
+    await loadUserManagement();
+
+  } catch (error) {
+    console.error("handleToggleUserStatus error:", error);
+    toast(error.message || `Gagal ${actionText} user.`, true);
+  }
+}
+
 async function handleEditUser(event) {
   event.preventDefault();
 
@@ -995,15 +1058,26 @@ function renderUserTable() {
                   </span>
                 `
                 : `
-                  <button
-                    type="button"
-                    class="buttonEditUser inline-flex items-center gap-1 text-[11px] text-amber-700 font-semibold hover:underline"
-                    data-user-id="${escapeHtml(user.id)}"
-                    title="Edit user"
-                  >
-                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                    Edit
-                  </button>
+                  <div class="inline-flex items-center gap-3">
+                    <button
+                      type="button"
+                      class="buttonEditUser inline-flex items-center gap-1 text-[11px] text-amber-700 font-semibold hover:underline"
+                      data-user-id="${escapeHtml(user.id)}"
+                      title="Edit user"
+                    >
+                      <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="buttonToggleUserStatus inline-flex items-center gap-1 text-[11px] font-semibold hover:underline ${user.is_active === false ? 'text-emerald-700' : 'text-red-700'}"
+                      data-user-id="${escapeHtml(user.id)}"
+                      title="${user.is_active === false ? 'Aktifkan user' : 'Nonaktifkan user'}"
+                    >
+                      <i data-lucide="${user.is_active === false ? 'check-circle-2' : 'ban'}" class="w-3.5 h-3.5"></i>
+                      ${user.is_active === false ? 'Aktifkan' : 'Nonaktifkan'}
+                    </button>
+                  </div>
                 `
             }
           </td>
@@ -1105,10 +1179,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   );
 
   document.getElementById('tableUsersBody')?.addEventListener('click', (event) => {
-    const button = event.target.closest('.buttonEditUser');
-    if (!button) return;
+    const editButton = event.target.closest('.buttonEditUser');
+    if (editButton) {
+      openEditUserModal(editButton.dataset.userId);
+      return;
+    }
 
-    openEditUserModal(button.dataset.userId);
+    const statusButton = event.target.closest('.buttonToggleUserStatus');
+    if (statusButton) {
+      handleToggleUserStatus(statusButton.dataset.userId);
+    }
   });
 
   document.getElementById('buttonAddUser')?.addEventListener('click', () => {
