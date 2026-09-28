@@ -26,7 +26,7 @@ const ready = (async () => {
 
   const { data: profile, error } = await client
     .from('profiles')
-    .select('full_name,role')
+    .select('full_name,role,is_master,is_active')
     .eq('id', session.user.id)
     .single();
 
@@ -45,6 +45,10 @@ window.HRDAuth = {
   ready,
   clientReady,
   can,
+
+  isMaster() {
+    return account?.profile?.is_master === true;
+  },
 
   async getAccessToken() {
     const result = await client.auth.getSession();

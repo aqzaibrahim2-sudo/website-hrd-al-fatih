@@ -492,11 +492,46 @@ function rejectProgram(idProgram) { updateApproval(idProgram, 'REJECT_PROGRAM');
 
 function switchView(view) {
   const isDashboard = view === 'dashboard';
-  document.getElementById('viewDashboard')?.classList.toggle('hidden', !isDashboard);
-  document.getElementById('viewProgram')?.classList.toggle('hidden', isDashboard);
-  document.querySelectorAll('[data-nav]').forEach(link => link.classList.toggle('active', link.dataset.nav === view));
-  document.querySelectorAll('.program-action').forEach(button => button.classList.toggle('hidden', isDashboard));
-  document.getElementById('sidebar')?.classList.remove('open');
+  const isProgram = view === 'program';
+  const isUsers = view === 'users';
+
+  document
+    .getElementById('viewDashboard')
+    ?.classList.toggle('hidden', !isDashboard);
+
+  document
+    .getElementById('viewProgram')
+    ?.classList.toggle('hidden', !isProgram);
+
+  document
+    .getElementById('viewUsers')
+    ?.classList.toggle('hidden', !isUsers);
+
+  document
+    .querySelectorAll('[data-nav]')
+    .forEach(link => {
+      link.classList.toggle(
+        'active',
+        link.dataset.nav === view
+      );
+    });
+
+  document
+    .querySelectorAll('.program-action')
+    .forEach(button => {
+      button.classList.toggle(
+        'hidden',
+        !isProgram
+      );
+    });
+
+  document
+    .getElementById('sidebar')
+    ?.classList.remove('open');
+
+  if (isUsers) {
+    loadUserManagement();
+  }
 }
 
 function openModal(id) {
@@ -538,6 +573,259 @@ function toast(msg, isError = false) {
   }, 3000);
 }
 
+
+/* =========================================================
+   USER MANAGEMENT — STEP 5A
+   ========================================================= */
+
+let userManagementData = [];
+
+async function loadUserManagement() {
+  const tbody = document.getElementById('tableUsersBody');
+
+  if (!tbody) return;
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="6" class="py-8 text-center text-stone-400">
+        Memuat data user...
+      </td>
+    </tr>
+  `;
+
+  try {
+    const token =
+      await window.HRDAuth.getAccessToken();
+
+    const response = await fetch('/api/users', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const payload =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        payload.error ||
+        'Gagal mengambil daftar user.'
+      );
+    }
+
+    userManagementData =
+      Array.isArray(payload.users)
+        ? payload.users
+        : [];
+
+    renderUserTable();
+
+  } catch (error) {
+
+    console.error(
+      'User management error:',
+      error
+    );
+
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="py-8 text-center text-red-500">
+          ${escapeHtml(
+            error.message ||
+            'Gagal memuat data user.'
+          )}
+        </td>
+      </tr>
+    `;
+  }
+}
+
+
+function renderUserTable() {
+  const tbody =
+    document.getElementById('tableUsersBody');
+
+  if (!tbody) return;
+
+  const search =
+    (
+      document.getElementById(
+        'userSearchInput'
+      )?.value || ''
+    )
+      .trim()
+      .toLowerCase();
+
+  const filtered =
+    userManagementData.filter(user => {
+
+      const name =
+        String(user.full_name || '')
+          .toLowerCase();
+
+      const email =
+        String(user.email || '')
+          .toLowerCase();
+
+      return (
+        !search ||
+        name.includes(search) ||
+        email.includes(search)
+      );
+    });
+
+
+  if (!filtered.length) {
+
+    tbody.innerHTML = `
+      <tr>
+        <td
+          colspan="6"
+          class="py-8 text-center text-stone-400"
+        >
+          Tidak ada user yang ditemukan.
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
+
+
+  tbody.innerHTML =
+    filtered.map(user => {
+
+      const role =
+        String(user.role || 'viewer')
+          .toUpperCase();
+
+      const status =
+        user.is_active !== false
+          ? 'Aktif'
+          : 'Nonaktif';
+
+      const statusClass =
+        user.is_active !== false
+          ? 'bg-emerald-50 text-emerald-700'
+          : 'bg-red-50 text-red-700';
+
+      const lastLogin =
+        user.last_sign_in_at
+          ? formatUserDate(
+              user.last_sign_in_at
+            )
+          : 'Belum login';
+
+      const name =
+        user.full_name ||
+        user.email ||
+        '-';
+
+      const masterBadge =
+        user.is_master
+          ? `
+            <span class="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
+              MASTER
+            </span>
+          `
+          : '';
+
+
+      return `
+        <tr class="hover:bg-stone-50">
+
+          <td class="py-3 px-3 font-medium text-stone-800">
+            ${escapeHtml(name)}
+            ${masterBadge}
+          </td>
+
+          <td class="py-3 px-3 text-stone-600">
+            ${escapeHtml(user.email || '-')}
+          </td>
+
+          <td class="py-3 px-3">
+            <span class="text-[10px] font-semibold uppercase px-2 py-1 rounded bg-stone-100 text-stone-700">
+              ${escapeHtml(role)}
+            </span>
+          </td>
+
+          <td class="py-3 px-3">
+            <span class="text-[10px] font-semibold px-2 py-1 rounded ${statusClass}">
+              ${status}
+            </span>
+          </td>
+
+          <td class="py-3 px-3 text-stone-500">
+            ${escapeHtml(lastLogin)}
+          </td>
+
+          <td class="py-3 px-3 text-right">
+            ${
+              user.is_master
+                ? `
+                  <span class="text-[10px] text-stone-400">
+                    Akun utama
+                  </span>
+                `
+                : `
+                  <button
+                    type="button"
+                    class="text-stone-400 cursor-not-allowed"
+                    disabled
+                    title="Aksi akan tersedia pada step berikutnya"
+                  >
+                    <i data-lucide="more-horizontal" class="w-4 h-4"></i>
+                  </button>
+                `
+            }
+          </td>
+
+        </tr>
+      `;
+
+    }).join('');
+
+
+  if (
+    window.lucide &&
+    typeof lucide.createIcons === 'function'
+  ) {
+    lucide.createIcons();
+  }
+}
+
+
+function formatUserDate(value) {
+  const date =
+    new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
+  return date.toLocaleDateString(
+    'id-ID',
+    {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }
+  );
+}
+
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+
+
 /* =========================================================
    6. INIT
    ========================================================= */
@@ -546,7 +834,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     lucide.createIcons();
   }
 
-  try { await window.HRDAuth.ready; fetchDataFromGoogleSheets(); } catch { return; }
+  try {
+  const account =
+    await window.HRDAuth.ready;
+
+  fetchDataFromGoogleSheets();
+
+  const userManagementNav =
+    document.getElementById(
+      'navUserManagement'
+    );
+
+  if (
+    userManagementNav &&
+    account?.profile?.is_master === true
+  ) {
+    userManagementNav.classList.remove(
+      'hidden'
+    );
+  }
+
+} catch {
+  return;
+}
 
   document.querySelectorAll('[data-nav]').forEach(link => {
     link.addEventListener('click', (e) => { e.preventDefault(); switchView(link.dataset.nav); });
@@ -562,6 +872,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("menuClose")?.addEventListener("click", () => {
     document.getElementById("sidebar")?.classList.remove("open");
   });
+  
+  document.getElementById('userSearchInput')?.addEventListener('input',
+    renderUserTable
+  );
 
   const todayLabel = document.getElementById("todayLabel");
   if (todayLabel) {
