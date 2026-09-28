@@ -1,14 +1,19 @@
 const PERMISSION_DEFINITIONS = [
-  { key: 'dashboard.view', label: 'Dashboard', roles: ['master', 'admin', 'hrd', 'direktur', 'viewer'] },
+  { key: 'dashboard.view', label: 'Lihat Dashboard', roles: ['master', 'admin', 'hrd', 'direktur', 'viewer'] },
   { key: 'program.view', label: 'Lihat Program', roles: ['master', 'admin', 'hrd', 'direktur', 'viewer'] },
   { key: 'program.create', label: 'Buat Program', roles: ['master', 'admin', 'hrd'] },
   { key: 'program.update', label: 'Update Program', roles: ['master', 'admin', 'hrd'] },
   { key: 'program.approve', label: 'Approval Program', roles: ['master', 'admin', 'direktur'] },
   { key: 'notulensi.view', label: 'Lihat Notulensi', roles: ['master', 'admin', 'hrd', 'direktur', 'viewer'] },
-  { key: 'notulensi.manage', label: 'Kelola Notulensi', roles: ['master', 'admin', 'hrd', 'direktur'] },
-  { key: 'master_data.manage', label: 'Master Data', roles: ['master', 'admin'] },
-  { key: 'users.manage', label: 'Manajemen User', roles: ['master'] },
-  { key: 'permissions.manage', label: 'Role & Permission', roles: ['master'] }
+  { key: 'notulensi.create', label: 'Buat Notulensi', roles: ['master', 'admin', 'hrd', 'direktur'] },
+  { key: 'notulensi.update', label: 'Update Notulensi', roles: ['master', 'admin', 'hrd', 'direktur'] },
+  { key: 'master_data.view', label: 'Lihat Master Data', roles: ['master', 'admin'] },
+  { key: 'master_data.manage', label: 'Kelola Master Data', roles: ['master', 'admin'] },
+  { key: 'users.view', label: 'Lihat User', roles: ['master'] },
+  { key: 'users.create', label: 'Buat User', roles: ['master'] },
+  { key: 'users.update', label: 'Update User', roles: ['master'] },
+  { key: 'users.delete', label: 'Hapus User', roles: ['master'] },
+  { key: 'users.manage_permissions', label: 'Kelola Permission', roles: ['master'] }
 ];
 
 function supabaseHeaders(secretKey) {
@@ -65,7 +70,7 @@ async function getTargetProfile(userId, SUPABASE_URL, SUPABASE_SECRET_KEY) {
 
 async function getOverrides(userId, SUPABASE_URL, SUPABASE_SECRET_KEY) {
   const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/user_permissions?user_id=eq.${encodeURIComponent(userId)}&select=permission_key,allowed,updated_at&order=permission_key.asc`,
+    `${SUPABASE_URL}/rest/v1/user_permissions?user_id=eq.${encodeURIComponent(userId)}&select=permission_id,allowed,created_at&order=permission_id.asc`,
     { headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` } }
   );
   if (!response.ok) {
@@ -75,20 +80,34 @@ async function getOverrides(userId, SUPABASE_URL, SUPABASE_SECRET_KEY) {
   return response.json();
 }
 
-function buildPermissionRows(role, overrides) {
-  const map = new Map((overrides || []).map(item => [item.permission_key, item]));
+function buildPermissionRows(role, overrides, permissionRows) {
+  const map = new Map((overrides || []).map(item => [String(item.permission_id), item]));
+  const idByKey = new Map((permissionRows || []).map(item => [item.code, item.id]));
   return PERMISSION_DEFINITIONS.map(def => {
     const defaultAllowed = def.roles.includes(role);
     const overrideItem = map.get(def.key);
     const override = overrideItem ? overrideItem.allowed === true : null;
     return {
       permission_key: def.key,
+      permission_id: idByKey.get(def.key) ?? null,
       label: def.label,
       default_allowed: defaultAllowed,
       override,
       effective_allowed: overrideItem ? override : defaultAllowed
     };
   });
+}
+
+async function getPermissionCatalog(SUPABASE_URL, SUPABASE_SECRET_KEY) {
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/permissions?select=id,code,name,module&order=module.asc,id.asc`,
+    { headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` } }
+  );
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Gagal mengambil daftar permission: ${text || 'database menolak permintaan.'}`);
+  }
+  return response.json();
 }
 
 module.exports = async function handler(req, res) {
@@ -106,10 +125,18 @@ module.exports = async function handler(req, res) {
       const target = await getTargetProfile(userId, master.SUPABASE_URL, master.SUPABASE_SECRET_KEY);
       if (!target) return res.status(404).json({ error: 'User tidak ditemukan.' });
 
-      const overrides = await getOverrides(userId, master.SUPABASE_URL, master.SUPABASE_SECRET_KEY);
+      const [overrides, catalog] = await Promise.all([
+        getOverrides(userId, master.SUPABASE_URL, master.SUPABASE_SECRET_KEY),
+        getPermissionCatalog(master.SUPABASE_URL, master.SUPABASE_SECRET_KEY)
+      ]);
+      const catalogByCode = new Map(catalog.map(item => [item.code, item]));
+      const missing = PERMISSION_DEFINITIONS.filter(def => !catalogByCode.has(def.key));
+      if (missing.length) {
+        throw new Error(`Permission belum tersedia di database: ${missing.map(item => item.key).join(', ')}`);
+      }
       return res.status(200).json({
         user: target,
-        permissions: buildPermissionRows(target.role, overrides)
+        permissions: buildPermissionRows(target.role, overrides, catalog)
       });
     }
 
@@ -129,18 +156,26 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Format overrides tidak valid.' });
     }
 
+    const catalog = await getPermissionCatalog(master.SUPABASE_URL, master.SUPABASE_SECRET_KEY);
+    const idByKey = new Map(catalog.map(item => [item.code, item.id]));
     const validKeys = new Set(PERMISSION_DEFINITIONS.map(item => item.key));
     for (const [key, value] of Object.entries(overrides)) {
       if (!validKeys.has(key)) return res.status(400).json({ error: `Permission tidak valid: ${key}` });
       if (value !== null && typeof value !== 'boolean') {
         return res.status(400).json({ error: `Nilai permission tidak valid: ${key}` });
       }
+      if (!idByKey.has(key)) {
+        return res.status(400).json({ error: `Permission belum terdaftar di database: ${key}` });
+      }
     }
 
     for (const [key, value] of Object.entries(overrides)) {
+      const permissionId = idByKey.get(key);
+      const filter = `user_id=eq.${encodeURIComponent(userId)}&permission_id=eq.${encodeURIComponent(permissionId)}`;
+
       if (value === null) {
         const response = await fetch(
-          `${master.SUPABASE_URL}/rest/v1/user_permissions?user_id=eq.${encodeURIComponent(userId)}&permission_key=eq.${encodeURIComponent(key)}`,
+          `${master.SUPABASE_URL}/rest/v1/user_permissions?${filter}`,
           { method: 'DELETE', headers: supabaseHeaders(master.SUPABASE_SECRET_KEY) }
         );
         if (!response.ok) {
@@ -148,23 +183,44 @@ module.exports = async function handler(req, res) {
           throw new Error(`Gagal menghapus override ${key}: ${text || 'database menolak permintaan.'}`);
         }
       } else {
-        const response = await fetch(`${master.SUPABASE_URL}/rest/v1/user_permissions`, {
-          method: 'POST',
-          headers: {
-            ...supabaseHeaders(master.SUPABASE_SECRET_KEY),
-            Prefer: 'resolution=merge-duplicates,return=minimal'
-          },
-          body: JSON.stringify({ user_id: userId, permission_key: key, allowed: value, updated_at: new Date().toISOString() })
-        });
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`Gagal menyimpan override ${key}: ${text || 'database menolak permintaan.'}`);
+        const existingResponse = await fetch(
+          `${master.SUPABASE_URL}/rest/v1/user_permissions?${filter}&select=user_id,permission_id`,
+          { headers: { apikey: master.SUPABASE_SECRET_KEY, Authorization: `Bearer ${master.SUPABASE_SECRET_KEY}` } }
+        );
+        if (!existingResponse.ok) {
+          const text = await existingResponse.text();
+          throw new Error(`Gagal memeriksa override ${key}: ${text || 'database menolak permintaan.'}`);
+        }
+        const existing = await existingResponse.json();
+        if (existing.length) {
+          const response = await fetch(
+            `${master.SUPABASE_URL}/rest/v1/user_permissions?${filter}`,
+            {
+              method: 'PATCH',
+              headers: { ...supabaseHeaders(master.SUPABASE_SECRET_KEY), Prefer: 'return=minimal' },
+              body: JSON.stringify({ allowed: value })
+            }
+          );
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Gagal memperbarui override ${key}: ${text || 'database menolak permintaan.'}`);
+          }
+        } else {
+          const response = await fetch(`${master.SUPABASE_URL}/rest/v1/user_permissions`, {
+            method: 'POST',
+            headers: { ...supabaseHeaders(master.SUPABASE_SECRET_KEY), Prefer: 'return=minimal' },
+            body: JSON.stringify({ user_id: userId, permission_id: permissionId, allowed: value })
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Gagal menyimpan override ${key}: ${text || 'database menolak permintaan.'}`);
+          }
         }
       }
     }
 
     const saved = await getOverrides(userId, master.SUPABASE_URL, master.SUPABASE_SECRET_KEY);
-    return res.status(200).json({ success: true, message: 'Permission berhasil disimpan.', permissions: buildPermissionRows(target.role, saved) });
+    return res.status(200).json({ success: true, message: 'Permission berhasil disimpan.', permissions: buildPermissionRows(target.role, saved, catalog) });
   } catch (error) {
     console.error('Role & Permission API error:', error);
     return res.status(error.statusCode || 500).json({ error: error.message || 'Terjadi kesalahan pada Role & Permission.' });
