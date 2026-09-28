@@ -37,13 +37,51 @@ const ready = (async () => {
     throw new Error('Akun Anda sedang tidak aktif. Hubungi MASTER untuk mengaktifkan kembali.');
   }
 
-  account = { session, profile };
+  let permissions = {};
+
+  try {
+    const token = session.access_token;
+    const permissionResponse = await fetch('/api/permissions', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store'
+    });
+
+    if (permissionResponse.ok) {
+      const permissionPayload = await permissionResponse.json();
+      permissions = permissionPayload.effective || {};
+    } else {
+      console.warn('Permission user belum dapat dimuat.');
+    }
+  } catch (permissionError) {
+    console.warn('Permission user gagal dimuat:', permissionError);
+  }
+
+  account = { session, profile, permissions };
   return account;
 })();
 
 function can(permission) {
-  const role = account?.profile?.role;
-  return permission === 'write' ? ['admin', 'hrd'].includes(role) : permission === 'approve' ? ['admin', 'direktur'].includes(role) : Boolean(role);
+  const permissions = account?.permissions || {};
+
+  const aliases = {
+    write: ['program_create', 'program_update'],
+    approve: ['program_approve'],
+    dashboard: ['dashboard_view'],
+    program: ['program_view'],
+    notulensi: ['notulensi_view'],
+    masterData: ['master_data_view'],
+    users: ['user_management_manage'],
+    rolePermission: ['role_permission_manage']
+  };
+
+  const keys = aliases[permission] || [permission];
+
+  if (account?.profile?.is_master === true) {
+    return true;
+  }
+
+  return keys.some(key => permissions[key] === true);
 }
 
 window.HRDAuth = {
