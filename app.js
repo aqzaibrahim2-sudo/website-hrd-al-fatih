@@ -552,6 +552,84 @@ function openModal(id) {
   }
 }
 
+  async function handleAddUser(event) {
+  event.preventDefault();
+
+  if (!window.HRDAuth?.isMaster?.()) {
+    toast("Hanya MASTER yang dapat menambahkan user.", true);
+    return;
+  }
+
+  const form = document.getElementById("formAddUser");
+  if (!form) return;
+
+  const button = form.querySelector('button[type="submit"]');
+  const originalText = button?.innerHTML;
+
+  const fullName = document.getElementById("formAddUserName")?.value.trim();
+  const email = document.getElementById("formAddUserEmail")?.value.trim();
+  const role = document.getElementById("formAddUserRole")?.value;
+
+  if (!fullName || !email || !role) {
+    toast("Nama, email, dan role wajib diisi.", true);
+    return;
+  }
+
+  try {
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Menambahkan...";
+    }
+
+    const accessToken = await window.HRDAuth.getAccessToken();
+
+    if (!accessToken) {
+      throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
+    }
+
+    const response = await fetch("/api/users", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        full_name: fullName,
+        email,
+        role
+      })
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        result?.error ||
+        result?.message ||
+        "Gagal menambahkan user."
+      );
+    }
+
+    toast("User berhasil ditambahkan.");
+
+    form.reset();
+
+    closeModal("modalAddUser");
+
+    await loadUserManagement();
+
+  } catch (error) {
+    console.error("handleAddUser error:", error);
+    toast(error.message || "Gagal menambahkan user.", true);
+
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = originalText || "Tambah User";
+    }
+  }
+}
+
 function closeModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -875,6 +953,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   document.getElementById('userSearchInput')?.addEventListener('input',
     renderUserTable
+  );
+
+  document.getElementById('buttonAddUser')?.addEventListener('click', () => {
+  if (!window.HRDAuth?.isMaster?.()) {
+    toast("Hanya MASTER yang dapat menambahkan user.", true);
+    return;
+  }
+
+  const form = document.getElementById('formAddUser');
+  form?.reset();
+
+  openModal('modalAddUser');
+  });
+
+  document.getElementById("formAddUser")?.addEventListener(
+  "submit",
+  handleAddUser
   );
 
   const todayLabel = document.getElementById("todayLabel");
