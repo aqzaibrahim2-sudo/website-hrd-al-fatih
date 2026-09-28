@@ -490,6 +490,12 @@ async function updateApproval(idProgram, action) {
 function approveProgram(idProgram) { updateApproval(idProgram, 'APPROVE_PROGRAM'); }
 function rejectProgram(idProgram) { updateApproval(idProgram, 'REJECT_PROGRAM'); }
 
+function closeMobileSidebar() {
+  document.getElementById("sidebar")?.classList.remove("open");
+  document.getElementById("sidebarBackdrop")?.classList.remove("is-visible");
+  document.body.classList.remove("sidebar-open");
+}
+
 function switchView(view) {
   const isDashboard = view === 'dashboard';
   const isProgram = view === 'program';
@@ -525,9 +531,7 @@ function switchView(view) {
       );
     });
 
-  document
-    .getElementById('sidebar')
-    ?.classList.remove('open');
+  closeMobileSidebar();
 
   if (isUsers) {
     loadUserManagement();
@@ -1086,32 +1090,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 }
 
   document.querySelectorAll('[data-nav]').forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      switchView(link.dataset.nav);
-      closeMobileMenu();
-    });
+    link.addEventListener('click', (e) => { e.preventDefault(); switchView(link.dataset.nav); });
   });
 
   document.getElementById("searchInput")?.addEventListener("input", renderProgramTable);
   document.getElementById("filterDept")?.addEventListener("change", renderProgramTable);
   document.getElementById("filterStatus")?.addEventListener("change", renderProgramTable);
 
-  const sidebar = document.getElementById("sidebar");
-  const closeMobileMenu = () => {
-    sidebar?.classList.remove("open");
-    document.body.classList.remove("sidebar-open");
-  };
   document.getElementById("menuToggle")?.addEventListener("click", () => {
-    const isOpen = sidebar?.classList.toggle("open") || false;
-    document.body.classList.toggle("sidebar-open", isOpen);
+    const sidebar = document.getElementById("sidebar");
+    const isOpening = !sidebar?.classList.contains("open");
+    sidebar?.classList.toggle("open", isOpening);
+    document.getElementById("sidebarBackdrop")?.classList.toggle("is-visible", isOpening);
+    document.body.classList.toggle("sidebar-open", isOpening);
   });
-  document.getElementById("menuClose")?.addEventListener("click", closeMobileMenu);
-  document.body.addEventListener("click", (event) => {
-    if (!document.body.classList.contains("sidebar-open")) return;
-    if (event.target.closest("#sidebar") || event.target.closest("#menuToggle")) return;
-    closeMobileMenu();
-  });
+  document.getElementById("menuClose")?.addEventListener("click", closeMobileSidebar);
+  document.getElementById("sidebarBackdrop")?.addEventListener("click", closeMobileSidebar);
   
   document.getElementById('userSearchInput')?.addEventListener('input',
     renderUserTable
