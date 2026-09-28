@@ -350,7 +350,7 @@ module.exports = async function handler(
   req,
   res
 ) {
-  if (!['GET', 'POST', 'PATCH'].includes(req.method)) {
+  if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(req.method)) {
     return res.status(405).json({
       error: 'Method tidak diizinkan.'
     });
@@ -491,6 +491,115 @@ module.exports = async function handler(
           role: updatedProfile.role,
           is_master: updatedProfile.is_master === true,
           is_active: updatedProfile.is_active !== false
+        }
+      });
+    }
+
+
+    /* =====================================================
+       DELETE — HAPUS USER
+       ===================================================== */
+
+    if (req.method === 'DELETE') {
+      const body =
+        typeof req.body === 'string'
+          ? JSON.parse(req.body || '{}')
+          : (req.body || {});
+
+      const userId =
+        String(body.id || '').trim();
+
+      if (!userId) {
+        return res.status(400).json({
+          error: 'ID user wajib diisi.'
+        });
+      }
+
+      // MASTER utama tidak boleh dihapus.
+      if (userId === master.user.id) {
+        return res.status(403).json({
+          error: 'Akun MASTER utama tidak dapat dihapus melalui website.'
+        });
+      }
+
+      // Pastikan target bukan akun MASTER.
+      const targetProfileResponse = await fetch(
+        `${master.SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=id,full_name,role,is_master,is_active`,
+        {
+          headers: {
+            apikey: master.SUPABASE_SECRET_KEY,
+            Authorization: `Bearer ${master.SUPABASE_SECRET_KEY}`
+          }
+        }
+      );
+
+      if (!targetProfileResponse.ok) {
+        throw new Error('Gagal membaca profile user yang akan dihapus.');
+      }
+
+      const targetProfiles = await targetProfileResponse.json();
+      const targetProfile = targetProfiles[0];
+
+      if (!targetProfile) {
+        return res.status(404).json({
+          error: 'User tidak ditemukan.'
+        });
+      }
+
+      if (targetProfile.is_master === true || targetProfile.role === 'master') {
+        return res.status(403).json({
+          error: 'Akun MASTER utama tidak dapat dihapus melalui website.'
+        });
+      }
+
+      // Hapus akun Auth terlebih dahulu agar user langsung tidak dapat login.
+      const authDeleteResponse = await fetch(
+        `${master.SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(userId)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            apikey: master.SUPABASE_SECRET_KEY,
+            Authorization: `Bearer ${master.SUPABASE_SECRET_KEY}`
+          }
+        }
+      );
+
+      if (!authDeleteResponse.ok) {
+        const text = await authDeleteResponse.text();
+        throw new Error(
+          `Gagal menghapus akun user: ${text || 'Auth user tidak dapat dihapus.'}`
+        );
+      }
+
+      // Bersihkan profile aplikasi. Jika database sudah menggunakan
+      // ON DELETE CASCADE, profile kemungkinan sudah ikut terhapus.
+      const profileDeleteResponse = await fetch(
+        `${master.SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            apikey: master.SUPABASE_SECRET_KEY,
+            Authorization: `Bearer ${master.SUPABASE_SECRET_KEY}`,
+            Prefer: 'return=minimal'
+          }
+        }
+      );
+
+      if (!profileDeleteResponse.ok) {
+        console.error(
+          'Auth user berhasil dihapus, tetapi profile cleanup gagal:',
+          await profileDeleteResponse.text()
+        );
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'User berhasil dihapus.',
+        user: {
+          id: userId,
+          email: null,
+          full_name: targetProfile.full_name || '',
+          role: targetProfile.role || 'viewer'
         }
       });
     }

@@ -722,6 +722,67 @@ async function handleToggleUserStatus(userId) {
   }
 }
 
+async function handleDeleteUser(userId) {
+  if (!window.HRDAuth?.isMaster?.()) {
+    toast("Hanya MASTER yang dapat menghapus user.", true);
+    return;
+  }
+
+  const user = userManagementData.find(item => item.id === userId);
+
+  if (!user) {
+    toast("Data user tidak ditemukan.", true);
+    return;
+  }
+
+  if (user.is_master) {
+    toast("Akun MASTER utama tidak dapat dihapus melalui website.", true);
+    return;
+  }
+
+  const userLabel = user.full_name || user.email || "user ini";
+
+  if (!window.confirm(
+    `Apakah Anda yakin ingin menghapus user "${userLabel}"?\n\nTindakan ini akan menghapus akun login user dan tidak dapat dibatalkan.`
+  )) {
+    return;
+  }
+
+  try {
+    const accessToken = await window.HRDAuth.getAccessToken();
+
+    if (!accessToken) {
+      throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
+    }
+
+    const response = await fetch("/api/users", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ id: userId })
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        result?.error ||
+        result?.message ||
+        "Gagal menghapus user."
+      );
+    }
+
+    toast("User berhasil dihapus.");
+    await loadUserManagement();
+
+  } catch (error) {
+    console.error("handleDeleteUser error:", error);
+    toast(error.message || "Gagal menghapus user.", true);
+  }
+}
+
 async function handleEditUser(event) {
   event.preventDefault();
 
@@ -1077,6 +1138,15 @@ function renderUserTable() {
                       <i data-lucide="${user.is_active === false ? 'check-circle-2' : 'ban'}" class="w-3.5 h-3.5"></i>
                       ${user.is_active === false ? 'Aktifkan' : 'Nonaktifkan'}
                     </button>
+                    <button
+                      type="button"
+                      class="buttonDeleteUser inline-flex items-center gap-1 text-[11px] text-red-700 font-semibold hover:underline"
+                      data-user-id="${escapeHtml(user.id)}"
+                      title="Hapus user"
+                    >
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                      Hapus
+                    </button>
                   </div>
                 `
             }
@@ -1188,6 +1258,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const statusButton = event.target.closest('.buttonToggleUserStatus');
     if (statusButton) {
       handleToggleUserStatus(statusButton.dataset.userId);
+    }
+
+    const deleteButton = event.target.closest('.buttonDeleteUser');
+    if (deleteButton) {
+      handleDeleteUser(deleteButton.dataset.userId);
     }
   });
 
