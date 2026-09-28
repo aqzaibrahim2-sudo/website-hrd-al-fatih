@@ -657,6 +657,154 @@ function toast(msg, isError = false) {
    ========================================================= */
 
 let userManagementData = [];
+let editingUserId = null;
+
+async function handleEditUser(event) {
+  event.preventDefault();
+
+  if (!window.HRDAuth?.isMaster?.()) {
+    toast("Hanya MASTER yang dapat mengedit user.", true);
+    return;
+  }
+
+  const form = document.getElementById("formEditUser");
+  if (!form || !editingUserId) {
+    toast("Data user yang diedit tidak ditemukan.", true);
+    return;
+  }
+
+  const fullName =
+    document.getElementById("formEditUserName")?.value.trim();
+
+  const role =
+    document.getElementById("formEditUserRole")?.value;
+
+  if (!fullName || !role) {
+    toast("Nama dan role wajib diisi.", true);
+    return;
+  }
+
+  const button =
+    form.querySelector('button[type="submit"]');
+
+  const originalText =
+    button?.innerHTML;
+
+  try {
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Menyimpan...";
+    }
+
+    const accessToken =
+      await window.HRDAuth.getAccessToken();
+
+    if (!accessToken) {
+      throw new Error(
+        "Sesi login tidak ditemukan. Silakan login kembali."
+      );
+    }
+
+    const response =
+      await fetch("/api/users", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          id: editingUserId,
+          full_name: fullName,
+          role
+        })
+      });
+
+    const result =
+      await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        result?.error ||
+        result?.message ||
+        "Gagal memperbarui user."
+      );
+    }
+
+    toast("Data user berhasil diperbarui.");
+
+    form.reset();
+    closeModal("modalEditUser");
+    editingUserId = null;
+
+    await loadUserManagement();
+
+  } catch (error) {
+    console.error("handleEditUser error:", error);
+    toast(
+      error.message || "Gagal memperbarui user.",
+      true
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.innerHTML =
+        originalText || "Simpan Perubahan";
+    }
+  }
+}
+
+function openEditUserModal(userId) {
+  if (!window.HRDAuth?.isMaster?.()) {
+    toast("Hanya MASTER yang dapat mengedit user.", true);
+    return;
+  }
+
+  const user =
+    userManagementData.find(
+      item => item.id === userId
+    );
+
+  if (!user) {
+    toast("Data user tidak ditemukan.", true);
+    return;
+  }
+
+  if (user.is_master) {
+    toast(
+      "Akun MASTER utama tidak dapat diedit melalui website.",
+      true
+    );
+    return;
+  }
+
+  editingUserId = user.id;
+
+  const nameInput =
+    document.getElementById("formEditUserName");
+
+  const emailInput =
+    document.getElementById("formEditUserEmail");
+
+  const roleSelect =
+    document.getElementById("formEditUserRole");
+
+  if (!nameInput || !emailInput || !roleSelect) {
+    toast("Form edit user tidak ditemukan.", true);
+    editingUserId = null;
+    return;
+  }
+
+  nameInput.value =
+    user.full_name || "";
+
+  emailInput.value =
+    user.email || "";
+
+  roleSelect.value =
+    user.role || "viewer";
+
+  openModal("modalEditUser");
+}
 
 async function loadUserManagement() {
   const tbody = document.getElementById('tableUsersBody');
@@ -849,11 +997,12 @@ function renderUserTable() {
                 : `
                   <button
                     type="button"
-                    class="text-stone-400 cursor-not-allowed"
-                    disabled
-                    title="Aksi akan tersedia pada step berikutnya"
+                    class="buttonEditUser inline-flex items-center gap-1 text-[11px] text-amber-700 font-semibold hover:underline"
+                    data-user-id="${escapeHtml(user.id)}"
+                    title="Edit user"
                   >
-                    <i data-lucide="more-horizontal" class="w-4 h-4"></i>
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                    Edit
                   </button>
                 `
             }
@@ -955,6 +1104,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderUserTable
   );
 
+  document.getElementById('tableUsersBody')?.addEventListener('click', (event) => {
+    const button = event.target.closest('.buttonEditUser');
+    if (!button) return;
+
+    openEditUserModal(button.dataset.userId);
+  });
+
   document.getElementById('buttonAddUser')?.addEventListener('click', () => {
   if (!window.HRDAuth?.isMaster?.()) {
     toast("Hanya MASTER yang dapat menambahkan user.", true);
@@ -970,6 +1126,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("formAddUser")?.addEventListener(
   "submit",
   handleAddUser
+  );
+
+  document.getElementById("formEditUser")?.addEventListener(
+    "submit",
+    handleEditUser
   );
 
   const todayLabel = document.getElementById("todayLabel");

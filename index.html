@@ -467,6 +467,82 @@
   </div>
 </div>
 
+<!-- Modal Edit User -->
+<div id="modalEditUser" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl border" style="border-color:#E4DFCE;">
+    <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color:#E4DFCE;">
+      <div>
+        <h3 class="text-base font-semibold text-stone-800">Edit User</h3>
+        <p class="text-[12px] text-stone-500 mt-0.5">Perbarui nama dan role pengguna.</p>
+      </div>
+      <button type="button" onclick="closeModal('modalEditUser')" class="text-stone-400 hover:text-stone-700" aria-label="Tutup">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <form id="formEditUser" class="p-5 space-y-4">
+      <div>
+        <label for="formEditUserName" class="text-[12px] font-medium block mb-1">
+          Nama Lengkap <span class="text-red-500">*</span>
+        </label>
+        <input
+          required
+          type="text"
+          id="formEditUserName"
+          class="field w-full text-[13.5px]"
+          placeholder="Nama lengkap pengguna"
+          autocomplete="name"
+        >
+      </div>
+
+      <div>
+        <label for="formEditUserEmail" class="text-[12px] font-medium block mb-1">
+          Email
+        </label>
+        <input
+          type="email"
+          id="formEditUserEmail"
+          class="field w-full text-[13.5px] bg-stone-100"
+          readonly
+        >
+        <p class="text-[10.5px] text-stone-400 mt-1">
+          Email tidak diubah pada Step 5C.
+        </p>
+      </div>
+
+      <div>
+        <label for="formEditUserRole" class="text-[12px] font-medium block mb-1">
+          Role <span class="text-red-500">*</span>
+        </label>
+        <select required id="formEditUserRole" class="field w-full text-[13.5px]">
+          <option value="viewer">VIEWER</option>
+          <option value="hrd">HRD</option>
+          <option value="direktur">DIREKTUR</option>
+          <option value="admin">ADMIN</option>
+        </select>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t" style="border-color:#E4DFCE;">
+        <button
+          type="button"
+          onclick="closeModal('modalEditUser')"
+          class="px-4 py-2 rounded-lg text-[13px] font-medium border"
+          style="border-color:#E4DFCE;"
+        >
+          Batal
+        </button>
+        <button
+          id="buttonSubmitEditUser"
+          type="submit"
+          class="btn-gold px-4 py-2 rounded-lg text-[13px]"
+        >
+          Simpan Perubahan
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="toast" class="fixed bottom-5 right-5 bg-stone-900 text-white px-4 py-3 rounded-xl shadow-xl text-xs font-medium z-50 transform translate-y-10 opacity-0 transition-all duration-300 flex items-center gap-2">
   <span id="toastMsg">Notifikasi</span>
 </div>

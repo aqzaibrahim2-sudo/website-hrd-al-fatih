@@ -255,6 +255,7 @@ async function updateProfile({
   userId,
   fullName,
   role,
+  isActive = true,
   SUPABASE_URL,
   SUPABASE_SECRET_KEY
 }) {
@@ -275,7 +276,7 @@ async function updateProfile({
         full_name: fullName,
         role,
         is_master: false,
-        is_active: true
+        is_active: isActive
       })
     }
   );
@@ -349,7 +350,7 @@ module.exports = async function handler(
   req,
   res
 ) {
-  if (!['GET', 'POST'].includes(req.method)) {
+  if (!['GET', 'POST', 'PATCH'].includes(req.method)) {
     return res.status(405).json({
       error: 'Method tidak diizinkan.'
     });
@@ -373,6 +374,104 @@ module.exports = async function handler(
 
       return res.status(200).json({
         users
+      });
+    }
+
+
+    /* =====================================================
+       PATCH — UPDATE USER
+       ===================================================== */
+
+    if (req.method === 'PATCH') {
+      const body =
+        typeof req.body === 'string'
+          ? JSON.parse(req.body || '{}')
+          : (req.body || {});
+
+      const userId =
+        String(body.id || '').trim();
+
+      const fullName =
+        String(body.full_name || '').trim();
+
+      const role =
+        String(body.role || '').trim().toLowerCase();
+
+      if (!userId) {
+        return res.status(400).json({
+          error: 'ID user wajib diisi.'
+        });
+      }
+
+      if (!fullName) {
+        return res.status(400).json({
+          error: 'Nama lengkap wajib diisi.'
+        });
+      }
+
+      if (!ALLOWED_ROLES.includes(role)) {
+        return res.status(400).json({
+          error: 'Role tidak valid.'
+        });
+      }
+
+      // MASTER utama tidak boleh diedit melalui endpoint ini.
+      if (userId === master.user.id) {
+        return res.status(403).json({
+          error: 'Akun MASTER utama tidak dapat diedit melalui website.'
+        });
+      }
+
+      // Pastikan target memang bukan akun MASTER.
+      const targetProfileResponse = await fetch(
+        `${master.SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=id,full_name,role,is_master,is_active`,
+        {
+          headers: {
+            apikey: master.SUPABASE_SECRET_KEY,
+            Authorization: `Bearer ${master.SUPABASE_SECRET_KEY}`
+          }
+        }
+      );
+
+      if (!targetProfileResponse.ok) {
+        throw new Error('Gagal membaca profile user yang akan diedit.');
+      }
+
+      const targetProfiles = await targetProfileResponse.json();
+      const targetProfile = targetProfiles[0];
+
+      if (!targetProfile) {
+        return res.status(404).json({
+          error: 'User tidak ditemukan.'
+        });
+      }
+
+      if (targetProfile.is_master === true || targetProfile.role === 'master') {
+        return res.status(403).json({
+          error: 'Akun MASTER utama tidak dapat diedit melalui website.'
+        });
+      }
+
+      const updatedProfile =
+        await updateProfile({
+          userId,
+          fullName,
+          role,
+          isActive: targetProfile.is_active !== false,
+          SUPABASE_URL: master.SUPABASE_URL,
+          SUPABASE_SECRET_KEY: master.SUPABASE_SECRET_KEY
+        });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Data user berhasil diperbarui.',
+        user: {
+          id: userId,
+          full_name: updatedProfile.full_name,
+          role: updatedProfile.role,
+          is_master: updatedProfile.is_master === true,
+          is_active: updatedProfile.is_active !== false
+        }
       });
     }
 
