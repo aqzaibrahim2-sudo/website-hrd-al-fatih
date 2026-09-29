@@ -152,12 +152,45 @@ function findProgramById_(ss, idProgram) {
   return { ID_PROGRAM: String(values[0] || ''), DEPARTEMEN: String(values[3] || '').trim() };
 }
 
+function programPrefix_(jenis) {
+  var normalized = String(jenis || 'Program').trim().toLowerCase();
+  var prefixes = { program: 'PRG', project: 'PRJ', issue: 'ISU', task: 'TSK' };
+  if (!prefixes[normalized]) throw new Error('Jenis Program tidak valid.');
+  return prefixes[normalized];
+}
+
+// Called only from doPost while ScriptLock is held. Reads the global Program sheet,
+// so HRD from every department shares one collision-safe sequence per type.
+function nextProgramId_(sheet, jenis) {
+  var prefix = programPrefix_(jenis);
+  var lastRow = sheet.getLastRow();
+  var ids = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues().map(function(row) { return String(row[0] || '').trim(); })
+    : [];
+  var maxNumber = 0;
+  var occupied = {};
+  var pattern = new RegExp('^' + prefix + '-(\\d+)$');
+  ids.forEach(function(id) {
+    occupied[id] = true;
+    var match = id.match(pattern);
+    if (match) maxNumber = Math.max(maxNumber, Number(match[1]));
+  });
+  var candidateNumber = maxNumber + 1;
+  var candidate = prefix + '-' + String(candidateNumber).padStart(3, '0');
+  while (occupied[candidate]) {
+    candidateNumber += 1;
+    candidate = prefix + '-' + String(candidateNumber).padStart(3, '0');
+  }
+  return candidate;
+}
+
 function appendProgram_(ss, data) {
   var sheet = getRequiredSheet_(ss, SHEET_NAMES.PROGRAM);
-  var id = requiredText_(data.ID_PROGRAM, "ID program");
+  // Ignore any client-supplied ID. Server allocates it under the script-wide lock.
+  var id = nextProgramId_(sheet, data.JENIS);
 
   if (findRowById_(sheet, id) !== -1) {
-    throw new Error("ID program " + id + " sudah ada. Silakan sinkronkan ulang lalu coba lagi.");
+    throw new Error("Nomor Program otomatis bertabrakan. Silakan coba simpan kembali.");
   }
 
   sheet.appendRow([
@@ -174,7 +207,7 @@ function appendProgram_(ss, data) {
     "Pending"
   ]);
   SpreadsheetApp.flush();
-  return json_({ success: true, message: "Program berhasil disimpan." });
+  return json_({ success: true, ID_PROGRAM: id, message: "Program berhasil disimpan." });
 }
 
 function appendUpdate_(ss, data) {

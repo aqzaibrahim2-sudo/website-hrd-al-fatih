@@ -125,25 +125,16 @@ async function sendDataToGoogleSheets(sheetName, rowData, action = "APPEND_ROW")
    3. AUTO ID & MASTER OPTIONS
    ========================================================= */
 function generateAutoID() {
-  const jenis = document.getElementById("formJenis") ? document.getElementById("formJenis").value : "Program";
-  let prefix = "PRG";
-  if (jenis === "Project") prefix = "PRJ";
-  if (jenis === "Issue") prefix = "ISU";
-  if (jenis === "Task") prefix = "TSK";
-
-  const existingIDs = MASTER_PROGRAM
-    .map(p => p.ID_PROGRAM)
-    .filter(id => id && id.startsWith(prefix + "-"));
-
-  let maxNum = 0;
-  existingIDs.forEach(id => {
-    const numPart = parseInt(id.split("-")[1], 10);
-    if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
-  });
-
-  const nextNum = String(maxNum + 1).padStart(3, "0");
+  const jenis = document.getElementById("formJenis")?.value || "Program";
+  const prefixes = { Program: "PRG", Project: "PRJ", Issue: "ISU", Task: "TSK" };
+  const prefix = prefixes[jenis] || "PRG";
   const autoField = document.getElementById("formAutoID");
-  if (autoField) autoField.value = `${prefix}-${nextNum}`;
+  // A preview based on the HRD's department-filtered browser data can be stale.
+  // The authoritative unique ID is allocated by Apps Script at save time.
+  if (autoField) {
+    autoField.value = "Otomatis saat disimpan";
+    autoField.placeholder = `${prefix}-###`;
+  }
 }
 
 function populateMasterOptions() {
@@ -380,25 +371,36 @@ async function handleAddProgram(e) {
 
   const submitButton = form.querySelector('button[type="submit"]');
   setButtonBusy(submitButton, true, "Menyimpan...");
-  toast("Menyimpan program baru...");
-  const res = await sendDataToGoogleSheets("MASTER_PROGRAM", data);
+  try {
+    toast("Menyimpan program baru...");
+    const res = await sendDataToGoogleSheets("MASTER_PROGRAM", data);
 
-  if (res.success) {
-    MASTER_PROGRAM.push({
-      ...data,
-      PROGRESS: 0,
-      STATUS: "On Track",
-      AKTIF: true,
-      STATUS_APPROVAL: "Pending"
-    });
-    renderAll();
-    closeModal("modalProgram");
-    form.reset();
-    toast("Program baru berhasil disimpan.");
-  } else {
-    toast(`Gagal menyimpan program: ${res.error || "terjadi kesalahan."}`, true);
+    if (res.success) {
+      const savedId = res.ID_PROGRAM || res.id_program || res.data?.ID_PROGRAM;
+      if (!savedId) {
+        toast("Server memberi respons tanpa ID Program. Muat ulang data untuk memeriksa apakah Program sudah tersimpan.", true);
+        return;
+      }
+      MASTER_PROGRAM.push({
+        ...data,
+        ID_PROGRAM: savedId,
+        PROGRESS: 0,
+        STATUS: "On Track",
+        AKTIF: true,
+        STATUS_APPROVAL: "Pending"
+      });
+      renderAll();
+      closeModal("modalProgram");
+      form.reset();
+      toast(`Program baru berhasil disimpan dengan ID ${savedId}.`);
+    } else {
+      toast(`Gagal menyimpan program: ${res.error || "terjadi kesalahan."}`, true);
+    }
+  } catch (error) {
+    toast(`Gagal menyimpan program: ${error.message || "terjadi kesalahan."}`, true);
+  } finally {
+    setButtonBusy(submitButton, false);
   }
-  setButtonBusy(submitButton, false);
 }
 
 async function handleAddUpdate(e) {
