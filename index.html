@@ -371,8 +371,10 @@
         </div>
         <div>
           <label class="text-[12px] font-medium block mb-1">ID Program <span class="text-xs text-stone-400">(Otomatis)</span></label>
-          <input type="text" readonly id="formAutoID" class="field w-full text-[13.5px] bg-stone-100 font-mono font-bold text-stone-700" value="Otomatis saat disimpan" placeholder="PRG-###" aria-describedby="programIdHelp">
-          <p id="programIdHelp" class="text-[10px] text-stone-500 mt-1">Nomor unik ditetapkan server saat data disimpan.</p>
+          <input type="text" readonly id="formAutoID" class="field w-full text-[13.5px] bg-stone-100 font-mono font-bold text-stone-700" value="Meminta nomor..." placeholder="PRG-###" aria-describedby="programIdHelp">
+          <input type="hidden" name="ID_PROGRAM" id="formProgramIdValue">
+          <input type="hidden" name="RESERVATION_TOKEN" id="formProgramReservation">
+          <p id="programIdHelp" class="text-[10px] text-stone-500 mt-1">Sistem mengambil nomor global sebelum data disimpan.</p>
         </div>
       </div>
 

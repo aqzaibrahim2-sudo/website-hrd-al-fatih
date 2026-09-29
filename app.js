@@ -14,6 +14,7 @@ let chartStatusInstance = null;
 let chartDeptInstance = null;
 let syncInProgress = false;
 const approvalInProgress = new Set();
+let programIdRequestSequence = 0;
 
 /* =========================================================
    2. SYNC WITH GOOGLE SHEETS
@@ -124,16 +125,32 @@ async function sendDataToGoogleSheets(sheetName, rowData, action = "APPEND_ROW")
 /* =========================================================
    3. AUTO ID & MASTER OPTIONS
    ========================================================= */
-function generateAutoID() {
-  const jenis = document.getElementById("formJenis")?.value || "Program";
-  const prefixes = { Program: "PRG", Project: "PRJ", Issue: "ISU", Task: "TSK" };
-  const prefix = prefixes[jenis] || "PRG";
-  const autoField = document.getElementById("formAutoID");
-  // A preview based on the HRD's department-filtered browser data can be stale.
-  // The authoritative unique ID is allocated by Apps Script at save time.
-  if (autoField) {
-    autoField.value = "Otomatis saat disimpan";
-    autoField.placeholder = `${prefix}-###`;
+async function generateAutoID() {
+  const jenis = document.getElementById('formJenis')?.value || 'Program';
+  const visible = document.getElementById('formAutoID');
+  const idInput = document.getElementById('formProgramIdValue');
+  const tokenInput = document.getElementById('formProgramReservation');
+  const help = document.getElementById('programIdHelp');
+  const requestId = ++programIdRequestSequence;
+  if (visible) visible.value = 'Meminta nomor...';
+  if (idInput) idInput.value = '';
+  if (tokenInput) tokenInput.value = '';
+  if (help) help.textContent = 'Sistem sedang memeriksa penomoran global.';
+  try {
+    const result = await sendDataToGoogleSheets('MASTER_PROGRAM', { JENIS: jenis }, 'RESERVE_PROGRAM_ID');
+    if (requestId !== programIdRequestSequence) return;
+    if (!result.success || !result.ID_PROGRAM || !result.RESERVATION_TOKEN) {
+      throw new Error(result.error || 'Server belum memberikan nomor Program.');
+    }
+    if (visible) visible.value = result.ID_PROGRAM;
+    if (idInput) idInput.value = result.ID_PROGRAM;
+    if (tokenInput) tokenInput.value = result.RESERVATION_TOKEN;
+    if (help) help.textContent = 'Nomor sudah dialokasikan sementara oleh server selama 30 menit.';
+  } catch (error) {
+    if (requestId !== programIdRequestSequence) return;
+    if (visible) visible.value = 'Gagal memperoleh ID';
+    if (help) help.textContent = error.message || 'Gagal memperoleh nomor. Tutup dan buka kembali form untuk mencoba lagi.';
+    toast(`Gagal memperoleh ID Program: ${error.message || 'kesalahan server.'}`, true);
   }
 }
 
@@ -368,6 +385,10 @@ async function handleAddProgram(e) {
   const form = e.target;
   const formData = new FormData(form);
   const data = Object.fromEntries(formData.entries());
+  if (!data.ID_PROGRAM || !data.RESERVATION_TOKEN) {
+    toast('ID Program belum dialokasikan. Tutup lalu buka kembali form untuk meminta nomor.', true);
+    return;
+  }
 
   const submitButton = form.querySelector('button[type="submit"]');
   setButtonBusy(submitButton, true, "Menyimpan...");
@@ -392,6 +413,8 @@ async function handleAddProgram(e) {
       renderAll();
       closeModal("modalProgram");
       form.reset();
+      const idDisplay = document.getElementById('formAutoID');
+      if (idDisplay) idDisplay.value = '';
       toast(`Program baru berhasil disimpan dengan ID ${savedId}.`);
     } else {
       toast(`Gagal menyimpan program: ${res.error || "terjadi kesalahan."}`, true);
@@ -566,7 +589,7 @@ function openModal(id) {
   if (id === 'modalProgram') {
     const tglInput = document.getElementById('formProgramTanggalTerbit');
     if (tglInput) tglInput.value = today;
-    generateAutoID();
+    void generateAutoID();
   }
   if (id === 'modalUpdate') {
     const tglUp = document.getElementById('formUpdateTanggal');

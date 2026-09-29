@@ -102,10 +102,16 @@ function doPost(e) {
     var accessContext = contents.accessContext || {};
     var scopeRole = String(accessContext.role || '').toLowerCase();
     var scopeDepartment = String(accessContext.departmentName || '').trim();
+    var scopeUserId = String(accessContext.userId || '').trim();
     if (scopeRole === 'hrd' && !scopeDepartment) throw new Error('Cakupan departemen HRD tidak valid.');
     var ss = getSpreadsheet_();
 
     if (!['master', 'admin', 'hrd', 'direktur', 'viewer'].includes(scopeRole)) throw new Error('Konteks role tidak valid.');
+
+    if (action === "RESERVE_PROGRAM_ID") {
+      if (!['master', 'admin', 'hrd'].includes(scopeRole) || !scopeUserId) throw new Error('Akses reservasi ID tidak diizinkan.');
+      return reserveProgramId_(ss, data.JENIS, scopeUserId);
+    }
 
     if (action === "APPROVE_PROGRAM" || action === "REJECT_PROGRAM") {
       if (scopeRole === 'hrd' || !['master', 'admin', 'direktur'].includes(scopeRole)) {
@@ -122,7 +128,7 @@ function doPost(e) {
       if (scopeRole === 'hrd' && String(data.DEPARTEMEN || '').trim() !== scopeDepartment) {
         throw new Error('HRD hanya dapat membuat Program untuk departemennya sendiri.');
       }
-      return appendProgram_(ss, data);
+      return appendProgram_(ss, data, scopeUserId);
     }
     if (sheetName === SHEET_NAMES.UPDATE) {
       if (scopeRole === 'hrd') {
@@ -159,55 +165,98 @@ function programPrefix_(jenis) {
   return prefixes[normalized];
 }
 
-// Called only from doPost while ScriptLock is held. Reads the global Program sheet,
-// so HRD from every department shares one collision-safe sequence per type.
-function nextProgramId_(sheet, jenis) {
-  var prefix = programPrefix_(jenis);
+// Sequence counters and short-lived reservations live in Apps Script properties.
+// All allocation and append operations are serialized by the ScriptLock in doPost.
+function reservationPropertyKey_(token) { return 'PROGRAM_RESERVATION_' + token; }
+function sequencePropertyKey_(prefix) { return 'PROGRAM_SEQUENCE_' + prefix; }
+
+function getMaxExistingNumber_(sheet, prefix) {
   var lastRow = sheet.getLastRow();
   var ids = lastRow > 1
     ? sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues().map(function(row) { return String(row[0] || '').trim(); })
     : [];
   var maxNumber = 0;
-  var occupied = {};
   var pattern = new RegExp('^' + prefix + '-(\\d+)$');
   ids.forEach(function(id) {
-    occupied[id] = true;
     var match = id.match(pattern);
     if (match) maxNumber = Math.max(maxNumber, Number(match[1]));
   });
-  var candidateNumber = maxNumber + 1;
-  var candidate = prefix + '-' + String(candidateNumber).padStart(3, '0');
-  while (occupied[candidate]) {
-    candidateNumber += 1;
-    candidate = prefix + '-' + String(candidateNumber).padStart(3, '0');
-  }
-  return candidate;
+  return maxNumber;
 }
 
-function appendProgram_(ss, data) {
-  var sheet = getRequiredSheet_(ss, SHEET_NAMES.PROGRAM);
-  // Ignore any client-supplied ID. Server allocates it under the script-wide lock.
-  var id = nextProgramId_(sheet, data.JENIS);
+function cleanupExpiredReservations_(props, now) {
+  var all = props.getProperties();
+  Object.keys(all).forEach(function(key) {
+    if (key.indexOf('PROGRAM_RESERVATION_') !== 0) return;
+    try {
+      var reservation = JSON.parse(all[key]);
+      if (!reservation.expiresAt || Number(reservation.expiresAt) <= now) props.deleteProperty(key);
+    } catch (ignored) { props.deleteProperty(key); }
+  });
+}
 
-  if (findRowById_(sheet, id) !== -1) {
-    throw new Error("Nomor Program otomatis bertabrakan. Silakan coba simpan kembali.");
+function reserveProgramId_(ss, jenis, userId) {
+  var sheet = getRequiredSheet_(ss, SHEET_NAMES.PROGRAM);
+  var prefix = programPrefix_(jenis);
+  var props = PropertiesService.getScriptProperties();
+  var now = Date.now();
+  cleanupExpiredReservations_(props, now);
+  var seqKey = sequencePropertyKey_(prefix);
+  var persisted = Number(props.getProperty(seqKey) || 0);
+  var nextNumber = Math.max(persisted, getMaxExistingNumber_(sheet, prefix)) + 1;
+  var id = prefix + '-' + String(nextNumber).padStart(3, '0');
+  var all = props.getProperties();
+  var occupied = {};
+  Object.keys(all).forEach(function(key) {
+    if (key.indexOf('PROGRAM_RESERVATION_') !== 0) return;
+    try {
+      var item = JSON.parse(all[key]);
+      if (item.id) occupied[item.id] = true;
+    } catch (ignored) {}
+  });
+  while (occupied[id] || findRowById_(sheet, id) !== -1) {
+    nextNumber += 1;
+    id = prefix + '-' + String(nextNumber).padStart(3, '0');
   }
+  var token = Utilities.getUuid();
+  var reservation = { id: id, prefix: prefix, userId: userId, createdAt: now, expiresAt: now + 30 * 60 * 1000 };
+  props.setProperty(seqKey, String(nextNumber));
+  props.setProperty(reservationPropertyKey_(token), JSON.stringify(reservation));
+  return json_({ success: true, ID_PROGRAM: id, RESERVATION_TOKEN: token, expiresAt: reservation.expiresAt });
+}
+
+function appendProgram_(ss, data, userId) {
+  var sheet = getRequiredSheet_(ss, SHEET_NAMES.PROGRAM);
+  var id = requiredText_(data.ID_PROGRAM, 'ID program');
+  var token = requiredText_(data.RESERVATION_TOKEN, 'Reservasi ID program');
+  var props = PropertiesService.getScriptProperties();
+  var key = reservationPropertyKey_(token);
+  var rawReservation = props.getProperty(key);
+  if (!rawReservation) throw new Error('Reservasi ID Program tidak ditemukan atau sudah kedaluwarsa. Silakan minta nomor baru.');
+  var reservation = JSON.parse(rawReservation);
+  if (reservation.userId !== userId || reservation.id !== id) throw new Error('Reservasi ID Program tidak cocok dengan sesi pengguna. Silakan minta nomor baru.');
+  if (Number(reservation.expiresAt) <= Date.now()) {
+    props.deleteProperty(key);
+    throw new Error('Reservasi ID Program sudah kedaluwarsa. Silakan minta nomor baru.');
+  }
+  if (findRowById_(sheet, id) !== -1) throw new Error('ID Program sudah digunakan. Silakan minta nomor baru.');
 
   sheet.appendRow([
     id,
-    String(data.NAMA_PROGRAM || ""),
-    String(data.JENIS || ""),
-    String(data.DEPARTEMEN || ""),
-    String(data.PIC || ""),
-    String(data.TANGGAL_TERBIT || ""),
-    String(data.TARGET_SELESAI || ""),
+    String(data.NAMA_PROGRAM || ''),
+    String(data.JENIS || ''),
+    String(data.DEPARTEMEN || ''),
+    String(data.PIC || ''),
+    String(data.TANGGAL_TERBIT || ''),
+    String(data.TARGET_SELESAI || ''),
     0,
-    "On Track",
-    String(data.KETERANGAN || ""),
-    "Pending"
+    'On Track',
+    String(data.KETERANGAN || ''),
+    'Pending'
   ]);
   SpreadsheetApp.flush();
-  return json_({ success: true, ID_PROGRAM: id, message: "Program berhasil disimpan." });
+  props.deleteProperty(key);
+  return json_({ success: true, ID_PROGRAM: id, message: 'Program berhasil disimpan.' });
 }
 
 function appendUpdate_(ss, data) {

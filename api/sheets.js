@@ -102,6 +102,7 @@ async function hasPermission(account, permissionCode, env) {
 function permissionForRequest(method, body) {
   if (method === 'GET') return 'program.view';
   const action = body.action || 'APPEND_ROW';
+  if (action === 'RESERVE_PROGRAM_ID') return 'program.create';
   if (action === 'APPROVE_PROGRAM' || action === 'REJECT_PROGRAM') return 'program.approve';
   if (action !== 'APPEND_ROW') {
     const error = new Error(`Aksi tidak dikenali: ${action}`);
@@ -141,7 +142,8 @@ module.exports = async function handler(req, res) {
     const isMaster = account.profile.is_master === true || role === 'master';
     const scope = {
       role: isMaster ? 'master' : role,
-      departmentName: role === 'hrd' ? account.department.name : null
+      departmentName: role === 'hrd' ? account.department.name : null,
+      userId: account.user.id
     };
 
     let response;
