@@ -1,0 +1,23 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..');
+const sheets = fs.readFileSync(path.join(root, 'api/sheets.js'), 'utf8');
+const users = fs.readFileSync(path.join(root, 'api/users.js'), 'utf8');
+const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+const gas = fs.readFileSync(path.join(root, 'code.gs'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+
+assert.match(sheets, /select=id,full_name,role,is_master,is_active,department_id/);
+assert.match(sheets, /Akun HRD belum ditetapkan ke departemen/);
+assert.match(sheets, /body: JSON\.stringify\(\{ \.\.\.body, accessContext: scope, internalKey: APPS_SCRIPT_SHARED_SECRET \}\)/);
+assert.match(sheets, /UPDATE_MINGGUAN = \(payload\.UPDATE_MINGGUAN \|\| \[\]\)\s*\.filter\(update => allowedProgramIds\.has/);
+assert.match(users, /if \(!departmentId\) throw new Error\('Akun HRD wajib memiliki departemen\.'/);
+assert.match(users, /department_id: departmentId/);
+assert.match(app, /HRD_ACCOUNT_SCOPE\?\.role === 'hrd'/);
+assert.match(app, /formAddUserDepartment/);
+assert.match(gas, /HRD hanya dapat membuat Program untuk departemennya sendiri/);
+assert.match(gas, /HRD tidak dapat membuat update untuk Program departemen lain/);
+assert.match(gas, /MASTER_DEPARTEMEN: scopeRole === 'hrd' \? \[scopeDepartment\]/);
+assert.match(html, /formEditUserDepartment/);
+console.log('PASS: 12 static department-access assertions');

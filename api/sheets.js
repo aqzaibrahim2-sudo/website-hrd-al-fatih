@@ -40,7 +40,7 @@ async function getAccount(req) {
   const user = await userResponse.json();
 
   const profileResponse = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=id,full_name,role,is_master,is_active`,
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=id,full_name,role,is_master,is_active,department_id`,
     { headers: supabaseAdminHeaders(SUPABASE_SECRET_KEY) }
   );
   if (!profileResponse.ok) throw new Error('Profil pengguna tidak dapat dibaca.');
@@ -52,7 +52,28 @@ async function getAccount(req) {
     error.statusCode = 403;
     throw error;
   }
-  return { user, profile };
+  const role = String(profile.role || '').toLowerCase();
+  let department = null;
+  if (role === 'hrd') {
+    if (!profile.department_id) {
+      const error = new Error('Akun HRD belum ditetapkan ke departemen. Hubungi MASTER.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const departmentResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/departments?id=eq.${encodeURIComponent(profile.department_id)}&select=id,code,name,is_active&limit=1`,
+      { headers: supabaseAdminHeaders(SUPABASE_SECRET_KEY) }
+    );
+    if (!departmentResponse.ok) throw new Error('Data departemen akun tidak dapat dibaca.');
+    const departments = await departmentResponse.json();
+    department = departments[0] || null;
+    if (!department || department.is_active !== true) {
+      const error = new Error('Departemen akun HRD tidak ditemukan atau tidak aktif. Hubungi MASTER.');
+      error.statusCode = 403;
+      throw error;
+    }
+  }
+  return { user, profile, department };
 }
 
 async function getPermissionId(code, env) {
@@ -116,16 +137,26 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    const role = String(account.profile.role || '').toLowerCase();
+    const isMaster = account.profile.is_master === true || role === 'master';
+    const scope = {
+      role: isMaster ? 'master' : role,
+      departmentName: role === 'hrd' ? account.department.name : null
+    };
+
     let response;
     if (req.method === 'GET') {
       const target = new URL(APPS_SCRIPT_URL);
       target.searchParams.set('internalKey', APPS_SCRIPT_SHARED_SECRET);
+      target.searchParams.set('scopeRole', scope.role);
+      if (scope.departmentName) target.searchParams.set('scopeDepartment', scope.departmentName);
       response = await fetch(target, { cache: 'no-store' });
     } else {
       response = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ ...body, internalKey: APPS_SCRIPT_SHARED_SECRET })
+        // Server-derived scope overrides any client-supplied context.
+        body: JSON.stringify({ ...body, accessContext: scope, internalKey: APPS_SCRIPT_SHARED_SECRET })
       });
     }
 
@@ -136,6 +167,20 @@ module.exports = async function handler(req, res) {
 
     if (!response.ok || payload.success === false) {
       return res.status(response.ok ? 400 : 502).json(payload);
+    }
+    // Defense in depth: HRD data is scoped again at the Vercel boundary.
+    if (req.method === 'GET' && role === 'hrd') {
+      const allowedProgramIds = new Set((payload.MASTER_PROGRAM || [])
+        .filter(program => String(program.DEPARTEMEN || '').trim() === account.department.name)
+        .map(program => String(program.ID_PROGRAM || '')));
+      payload.MASTER_PROGRAM = (payload.MASTER_PROGRAM || [])
+        .filter(program => allowedProgramIds.has(String(program.ID_PROGRAM || '')));
+      payload.UPDATE_MINGGUAN = (payload.UPDATE_MINGGUAN || [])
+        .filter(update => allowedProgramIds.has(String(update.ID_PROGRAM || '')));
+      payload.MASTER_DEPARTEMEN = [account.department.name];
+      payload.accountScope = { role: 'hrd', departmentName: account.department.name };
+    } else if (req.method === 'GET') {
+      payload.accountScope = { role: isMaster ? 'master' : role, departmentName: null };
     }
     return res.status(200).json(payload);
   } catch (error) {

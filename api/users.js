@@ -58,7 +58,7 @@ async function getMasterAccount(req) {
 
   // Ambil profile MASTER
   const profileResponse = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=id,full_name,role,is_master,is_active`,
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=id,full_name,role,is_master,is_active,department_id`,
     {
       headers: {
         apikey: SUPABASE_SECRET_KEY,
@@ -136,7 +136,7 @@ async function getAllUsers(
 
   // Ambil profile aplikasi
   const profileResponse = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?select=id,full_name,role,is_master,is_active,created_at,updated_at&order=created_at.asc`,
+    `${SUPABASE_URL}/rest/v1/profiles?select=id,full_name,role,is_master,is_active,department_id,created_at,updated_at&order=created_at.asc`,
     {
       headers: {
         apikey: SUPABASE_SECRET_KEY,
@@ -162,14 +162,25 @@ async function getAllUsers(
     ])
   );
 
+  const departmentResponse = await fetch(
+    `${SUPABASE_URL}/rest/v1/departments?select=id,name,is_active`,
+    { headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` } }
+  );
+  if (!departmentResponse.ok) throw new Error('Gagal mengambil daftar departemen.');
+  const departments = await departmentResponse.json();
+  const departmentMap = new Map(departments.map(item => [item.id, item]));
+
   return authUsers.map(authUser => {
     const profile = profileMap.get(authUser.id);
+    const department = departmentMap.get(profile?.department_id);
 
     return {
       id: authUser.id,
       email: authUser.email || '',
       full_name: profile?.full_name || '',
       role: profile?.role || 'viewer',
+      department_id: profile?.department_id || null,
+      department_name: department?.name || null,
       is_master: profile?.is_master === true,
       is_active: profile?.is_active !== false,
       created_at:
@@ -247,6 +258,21 @@ async function inviteUser({
 }
 
 
+async function validateDepartmentId(departmentId, role, SUPABASE_URL, SUPABASE_SECRET_KEY) {
+  if (role !== 'hrd') {
+    if (departmentId) throw new Error('Departemen hanya dapat ditetapkan untuk akun HRD.');
+    return null;
+  }
+  if (!departmentId) throw new Error('Akun HRD wajib memiliki departemen.');
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/departments?id=eq.${encodeURIComponent(departmentId)}&select=id,is_active&limit=1`, {
+    headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` }
+  });
+  if (!response.ok) throw new Error('Gagal memvalidasi departemen.');
+  const rows = await response.json();
+  if (!rows[0] || rows[0].is_active !== true) throw new Error('Departemen tidak ditemukan atau tidak aktif.');
+  return rows[0].id;
+}
+
 /* =========================================================
    UPDATE PROFILE
    ========================================================= */
@@ -256,6 +282,7 @@ async function updateProfile({
   fullName,
   role,
   isActive = true,
+  departmentId = null,
   SUPABASE_URL,
   SUPABASE_SECRET_KEY
 }) {
@@ -276,7 +303,8 @@ async function updateProfile({
         full_name: fullName,
         role,
         is_master: false,
-        is_active: isActive
+        is_active: isActive,
+        department_id: departmentId
       })
     }
   );
@@ -394,6 +422,7 @@ module.exports = async function handler(
       const hasFullName = Object.prototype.hasOwnProperty.call(body, 'full_name');
       const hasRole = Object.prototype.hasOwnProperty.call(body, 'role');
       const hasIsActive = Object.prototype.hasOwnProperty.call(body, 'is_active');
+      const hasDepartment = Object.prototype.hasOwnProperty.call(body, 'department_id');
 
       const fullName =
         String(body.full_name || '').trim();
@@ -402,6 +431,7 @@ module.exports = async function handler(
         String(body.role || '').trim().toLowerCase();
 
       const requestedIsActive = body.is_active;
+      const requestedDepartmentId = body.department_id || null;
 
       if (!userId) {
         return res.status(400).json({
@@ -429,7 +459,7 @@ module.exports = async function handler(
         });
       }
 
-      if (!isProfileEdit && !hasIsActive) {
+      if (!isProfileEdit && !hasIsActive && !hasDepartment) {
         return res.status(400).json({
           error: 'Tidak ada perubahan user yang dikirim.'
         });
@@ -444,7 +474,7 @@ module.exports = async function handler(
 
       // Pastikan target memang bukan akun MASTER.
       const targetProfileResponse = await fetch(
-        `${master.SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=id,full_name,role,is_master,is_active`,
+        `${master.SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=id,full_name,role,is_master,is_active,department_id`,
         {
           headers: {
             apikey: master.SUPABASE_SECRET_KEY,
@@ -472,12 +502,16 @@ module.exports = async function handler(
         });
       }
 
+      const effectiveRole = isProfileEdit ? role : targetProfile.role;
+      const effectiveDepartmentId = hasDepartment ? await validateDepartmentId(requestedDepartmentId, effectiveRole, master.SUPABASE_URL, master.SUPABASE_SECRET_KEY) : (effectiveRole === 'hrd' ? targetProfile.department_id : null);
+      if (effectiveRole === 'hrd' && !effectiveDepartmentId) throw new Error('Akun HRD wajib memiliki departemen.');
       const updatedProfile =
         await updateProfile({
           userId,
           fullName: isProfileEdit ? fullName : targetProfile.full_name,
           role: isProfileEdit ? role : targetProfile.role,
           isActive: hasIsActive ? requestedIsActive : targetProfile.is_active !== false,
+          departmentId: effectiveDepartmentId,
           SUPABASE_URL: master.SUPABASE_URL,
           SUPABASE_SECRET_KEY: master.SUPABASE_SECRET_KEY
         });
@@ -490,7 +524,8 @@ module.exports = async function handler(
           full_name: updatedProfile.full_name,
           role: updatedProfile.role,
           is_master: updatedProfile.is_master === true,
-          is_active: updatedProfile.is_active !== false
+          is_active: updatedProfile.is_active !== false,
+          department_id: updatedProfile.department_id || null
         }
       });
     }
@@ -524,7 +559,7 @@ module.exports = async function handler(
 
       // Pastikan target bukan akun MASTER.
       const targetProfileResponse = await fetch(
-        `${master.SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=id,full_name,role,is_master,is_active`,
+        `${master.SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=id,full_name,role,is_master,is_active,department_id`,
         {
           headers: {
             apikey: master.SUPABASE_SECRET_KEY,
@@ -628,6 +663,7 @@ module.exports = async function handler(
       String(body.role || 'viewer')
         .trim()
         .toLowerCase();
+    const departmentId = await validateDepartmentId(body.department_id || null, role, master.SUPABASE_URL, master.SUPABASE_SECRET_KEY);
 
 
     /* VALIDASI EMAIL */
@@ -684,6 +720,7 @@ module.exports = async function handler(
         email,
         fullName,
         role,
+        departmentId,
         SUPABASE_URL:
           master.SUPABASE_URL,
         SUPABASE_SECRET_KEY:

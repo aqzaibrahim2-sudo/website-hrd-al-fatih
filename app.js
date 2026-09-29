@@ -8,6 +8,7 @@ let MASTER_PROGRAM = [];
 let UPDATE_MINGGUAN = [];
 let MASTER_DEPARTEMEN = [];
 let MASTER_PIC = [];
+let HRD_ACCOUNT_SCOPE = null;
 
 let chartStatusInstance = null;
 let chartDeptInstance = null;
@@ -88,6 +89,7 @@ async function fetchDataFromGoogleSheets() {
     UPDATE_MINGGUAN = json.UPDATE_MINGGUAN || [];
     MASTER_DEPARTEMEN = json.MASTER_DEPARTEMEN || [];
     MASTER_PIC = json.MASTER_PIC || [];
+    HRD_ACCOUNT_SCOPE = json.accountScope || null;
 
     populateFilterOptions();
     populateMasterOptions();
@@ -148,8 +150,11 @@ function populateMasterOptions() {
   // Dropdown Departemen di Form
   const deptSelect = document.getElementById("formProgramDept");
   if (deptSelect) {
-    deptSelect.innerHTML = '<option value="">-- Pilih Departemen --</option>' +
-      MASTER_DEPARTEMEN.map(d => `<option value="${d}">${d}</option>`).join("");
+    const isScopedHrd = HRD_ACCOUNT_SCOPE?.role === 'hrd' && HRD_ACCOUNT_SCOPE.departmentName;
+    deptSelect.innerHTML = isScopedHrd
+      ? `<option value="${HRD_ACCOUNT_SCOPE.departmentName}">${HRD_ACCOUNT_SCOPE.departmentName}</option>`
+      : '<option value="">-- Pilih Departemen --</option>' + MASTER_DEPARTEMEN.map(d => `<option value="${d}">${d}</option>`).join("");
+    if (isScopedHrd) deptSelect.value = HRD_ACCOUNT_SCOPE.departmentName;
   }
 
   // Dropdown PIC di Form
@@ -171,9 +176,11 @@ function populateFilterOptions() {
   const filterDept = document.getElementById("filterDept");
   if (!filterDept) return;
   const curr = filterDept.value;
-  filterDept.innerHTML = '<option value="">Semua Dept</option>' +
-    MASTER_DEPARTEMEN.map(d => `<option value="${d}">${d}</option>`).join("");
-  filterDept.value = curr;
+  const isScopedHrd = HRD_ACCOUNT_SCOPE?.role === 'hrd' && HRD_ACCOUNT_SCOPE.departmentName;
+  filterDept.innerHTML = isScopedHrd
+    ? `<option value="${HRD_ACCOUNT_SCOPE.departmentName}">${HRD_ACCOUNT_SCOPE.departmentName}</option>`
+    : '<option value="">Semua Dept</option>' + MASTER_DEPARTEMEN.map(d => `<option value="${d}">${d}</option>`).join("");
+  filterDept.value = isScopedHrd ? HRD_ACCOUNT_SCOPE.departmentName : curr;
 }
 
 /* =========================================================
@@ -582,8 +589,9 @@ function openModal(id) {
   const fullName = document.getElementById("formAddUserName")?.value.trim();
   const email = document.getElementById("formAddUserEmail")?.value.trim();
   const role = document.getElementById("formAddUserRole")?.value;
+  const departmentId = role === 'hrd' ? document.getElementById('formAddUserDepartment')?.value : null;
 
-  if (!fullName || !email || !role) {
+  if (!fullName || !email || !role || (role === 'hrd' && !departmentId)) {
     toast("Nama, email, dan role wajib diisi.", true);
     return;
   }
@@ -609,7 +617,8 @@ function openModal(id) {
       body: JSON.stringify({
         full_name: fullName,
         email,
-        role
+        role,
+        department_id: departmentId || null
       })
     });
 
@@ -671,6 +680,29 @@ function toast(msg, isError = false) {
 
 let userManagementData = [];
 let editingUserId = null;
+const HRD_DEPARTMENT_OPTIONS = [
+  ['a1000000-0000-4000-8000-000000000001', 'Departemen Personalia'],
+  ['a1000000-0000-4000-8000-000000000002', 'Departemen Rekrutmen dan Seleksi'],
+  ['a1000000-0000-4000-8000-000000000003', 'Departemen Kesekretariatan dan Program'],
+  ['a1000000-0000-4000-8000-000000000004', 'Departemen Kaderisasi']
+];
+function populateUserDepartmentOptions() {
+  ['formAddUserDepartment', 'formEditUserDepartment'].forEach(id => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    select.innerHTML = '<option value="">-- Pilih Departemen --</option>' + HRD_DEPARTMENT_OPTIONS.map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+  });
+}
+function syncUserDepartmentField(mode) {
+  const roleId = mode === 'edit' ? 'formEditUserRole' : 'formAddUserRole';
+  const wrapId = mode === 'edit' ? 'editUserDepartmentWrap' : 'addUserDepartmentWrap';
+  const selectId = mode === 'edit' ? 'formEditUserDepartment' : 'formAddUserDepartment';
+  const isHrd = document.getElementById(roleId)?.value === 'hrd';
+  document.getElementById(wrapId)?.classList.toggle('hidden', !isHrd);
+  const select = document.getElementById(selectId);
+  if (select) select.required = isHrd;
+}
+
 
 async function handleToggleUserStatus(userId) {
   if (!window.HRDAuth?.isMaster?.()) {
@@ -815,8 +847,9 @@ async function handleEditUser(event) {
 
   const role =
     document.getElementById("formEditUserRole")?.value;
+  const departmentId = role === 'hrd' ? document.getElementById('formEditUserDepartment')?.value : null;
 
-  if (!fullName || !role) {
+  if (!fullName || !role || (role === 'hrd' && !departmentId)) {
     toast("Nama dan role wajib diisi.", true);
     return;
   }
@@ -852,7 +885,8 @@ async function handleEditUser(event) {
         body: JSON.stringify({
           id: editingUserId,
           full_name: fullName,
-          role
+          role,
+          department_id: departmentId || null
         })
       });
 
@@ -937,8 +971,10 @@ function openEditUserModal(userId) {
   emailInput.value =
     user.email || "";
 
-  roleSelect.value =
-    user.role || "viewer";
+  roleSelect.value = user.role || "viewer";
+  const departmentSelect = document.getElementById('formEditUserDepartment');
+  if (departmentSelect) departmentSelect.value = user.department_id || '';
+  syncUserDepartmentField('edit');
 
   openModal("modalEditUser");
 }
@@ -950,7 +986,7 @@ async function loadUserManagement() {
 
   tbody.innerHTML = `
     <tr>
-      <td colspan="6" class="py-8 text-center text-stone-400">
+      <td colspan="7" class="py-8 text-center text-stone-400">
         Memuat data user...
       </td>
     </tr>
@@ -993,7 +1029,7 @@ async function loadUserManagement() {
 
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="py-8 text-center text-red-500">
+        <td colspan="7" class="py-8 text-center text-red-500">
           ${escapeHtml(
             error.message ||
             'Gagal memuat data user.'
@@ -1112,6 +1148,7 @@ function renderUserTable() {
               ${escapeHtml(role)}
             </span>
           </td>
+          <td class="py-3 px-3 text-stone-600">${escapeHtml(user.department_name || (user.role === 'hrd' ? 'Belum ditetapkan' : '-'))}</td>
 
           <td class="py-3 px-3">
             <span class="text-[10px] font-semibold px-2 py-1 rounded ${statusClass}">
@@ -1499,10 +1536,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const form = document.getElementById('formAddUser');
   form?.reset();
+  syncUserDepartmentField('add');
 
   openModal('modalAddUser');
   });
 
+  populateUserDepartmentOptions();
+  document.getElementById('formAddUserRole')?.addEventListener('change', () => syncUserDepartmentField('add'));
+  document.getElementById('formEditUserRole')?.addEventListener('change', () => syncUserDepartmentField('edit'));
+  syncUserDepartmentField('add');
+  syncUserDepartmentField('edit');
   document.getElementById("formAddUser")?.addEventListener(
   "submit",
   handleAddUser
